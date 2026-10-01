@@ -144,7 +144,7 @@ def main():
         optimizer.load_state_dict(checkpoint["optimizer"])
         curriculum.load_state_dict(checkpoint["curriculum"])
         update, env_steps, wandb_id, best = checkpoint["update"], checkpoint["env_steps"], checkpoint["wandb_id"], checkpoint["best"]
-        torch.set_rng_state(checkpoint["torch_rng"])
+        torch.set_rng_state(checkpoint["torch_rng"].cpu())  # map_location moved it to the GPU
         np.random.set_state(checkpoint["numpy_rng"])
         print(f"resumed {run_dir}/latest.pt at update {update}, {env_steps} env steps, difficulty {curriculum.difficulty}")
     with open(run_dir / "config.json", "w") as f:
