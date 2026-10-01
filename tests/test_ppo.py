@@ -38,3 +38,13 @@ def test_smoke_training_writes_checkpoints_and_resumes(tmp_path):
     assert first["update"] == 4 and (tmp_path / "t" / "best.pt").exists()
     subprocess.run(common + ["--resume", "ppo.total_steps=1536"], check=True, timeout=600)
     assert torch.load(tmp_path / "t" / "latest.pt", weights_only=False)["update"] == 6
+
+
+def test_recurrent_smoke_training_and_resume(tmp_path):
+    common = [sys.executable, "-m", "cornichon_rl.ppo", "--config", "configs/smoke.yaml", "--name", "r",
+              f"out_dir={tmp_path}", "model.recurrent=true"]
+    subprocess.run(common, check=True, timeout=600)
+    subprocess.run(common + ["--resume", "ppo.total_steps=1536"], check=True, timeout=600)
+    checkpoint = torch.load(tmp_path / "r" / "latest.pt", weights_only=False)
+    assert checkpoint["update"] == 6 and checkpoint["config"]["model"]["recurrent"] is True
+    assert any("lstm" in key for key in checkpoint["model"])

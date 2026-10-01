@@ -52,6 +52,7 @@ def episode_summary(row, steps, limit, episode_return, parts, start_distance):
         "difficulty": row["difficulty"],
         "seed": row["seed"],
         "mobs_killed": row["mobs_killed"],
+        "damage_dealt": row["damage_dealt"],
         "damage": row["damage"],
         "collected": row["collected"],
         "score": row["score"],

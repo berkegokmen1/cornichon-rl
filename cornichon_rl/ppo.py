@@ -41,26 +41,47 @@ def compute_gae(rewards, values, last_value, dones, gamma, lam):
     return advantages, advantages + values
 
 
+def _minibatches(model, batch, count):
+    """Yield (logits, values, flat index) per minibatch. A recurrent model needs whole sequences, so it splits by env;
+    a feed-forward model splits individual steps."""
+    steps, envs = batch["starts"].shape
+    obs = {"grid": batch["grid"], "state": batch["state"]}
+    if model.recurrent:
+        order = torch.randperm(envs, device=batch["starts"].device)
+        size = envs // count
+        for start in range(0, size * count, size):
+            idx = order[start : start + size]
+            state = (batch["state0"][0][idx], batch["state0"][1][idx])
+            logits, values = model.forward_sequence({k: v[:, idx] for k, v in obs.items()}, state, batch["starts"][:, idx])
+            flat = (torch.arange(steps, device=idx.device).unsqueeze(1) * envs + idx.unsqueeze(0)).flatten()
+            yield logits, values, flat
+    else:
+        flat_obs = {k: v.flatten(0, 1) for k, v in obs.items()}
+        order = torch.randperm(steps * envs, device=batch["starts"].device)
+        size = steps * envs // count
+        for start in range(0, size * count, size):
+            idx = order[start : start + size]
+            logits, values, _ = model({k: v[idx] for k, v in flat_obs.items()})
+            yield logits, values, idx
+
+
 def ppo_update(model, optimizer, batch, config):
-    """A few epochs of clipped PPO over one rollout. Returns averaged diagnostics."""
-    size = batch["actions"].shape[0]
-    minibatch = size // config.minibatches
+    """A few epochs of clipped PPO over one (T, N) rollout. Returns averaged diagnostics."""
+    flat = {k: batch[k].flatten(0, 1) for k in ("actions", "log_probs", "advantages", "returns")}
     stats = {"policy": [], "value": [], "entropy": [], "total": [], "approx_kl": [], "clip_frac": []}
     for _ in range(config.epochs):
-        order = torch.randperm(size, device=batch["actions"].device)
-        for start in range(0, minibatch * config.minibatches, minibatch):
-            idx = order[start : start + minibatch]
-            dists, value = model.distributions({"grid": batch["grid"][idx], "state": batch["state"][idx]})
-            actions = batch["actions"][idx]
+        for logits, value, idx in _minibatches(model, batch, config.minibatches):
+            dists = [torch.distributions.Categorical(logits=l) for l in logits]
+            actions = flat["actions"][idx]
             log_prob = sum(d.log_prob(actions[:, i]) for i, d in enumerate(dists))
             entropy = sum(d.entropy() for d in dists).mean()
 
-            advantages = batch["advantages"][idx]
+            advantages = flat["advantages"][idx]
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-            log_ratio = log_prob - batch["log_probs"][idx]
+            log_ratio = log_prob - flat["log_probs"][idx]
             ratio = log_ratio.exp()
             policy_loss = -torch.min(ratio * advantages, ratio.clamp(1 - config.clip, 1 + config.clip) * advantages).mean()
-            value_loss = 0.5 * (value - batch["returns"][idx]).pow(2).mean()
+            value_loss = 0.5 * (value - flat["returns"][idx]).pow(2).mean()
             loss = policy_loss + config.value_coef * value_loss - config.entropy_coef * entropy
 
             optimizer.zero_grad()
@@ -87,7 +108,7 @@ def episode_metrics(episodes, prefix):
     if not episodes:
         return {}
     metrics = {f"{prefix}/episodes": len(episodes)}
-    for key in ("return", "length", "time_limit", "success", "death", "timeout", "progress", "mobs_killed", "damage", "collected", "score"):
+    for key in ("return", "length", "time_limit", "success", "death", "timeout", "progress", "mobs_killed", "damage_dealt", "damage", "collected", "score"):
         metrics[f"{prefix}/{key}"] = float(np.mean([float(e[key]) for e in episodes]))
     for part in episodes[0]["parts"]:
         metrics[f"reward_parts/{part}"] = float(np.mean([e["parts"].get(part, 0.0) for e in episodes]))
@@ -133,7 +154,9 @@ def main():
     np.random.seed(config.seed)
     torch.manual_seed(config.seed)
     curriculum = Curriculum(config.curriculum, np.random.default_rng(config.seed))
-    model = ActorCritic(config.env.view_height, config.env.view_width).to(device)
+    model = ActorCritic(
+        config.env.view_height, config.env.view_width, hidden=config.model.hidden, recurrent=config.model.recurrent
+    ).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ppo.lr, eps=1e-5)
 
     update, env_steps, wandb_id = 0, 0, None
@@ -176,11 +199,14 @@ def main():
         "values": torch.zeros((horizon, n), device=device),
         "rewards": torch.zeros((horizon, n), device=device),
         "dones": torch.zeros((horizon, n), device=device),
+        "starts": torch.zeros((horizon, n), device=device),  # env begins a new episode at this step (resets memory)
     }
     recent = deque(maxlen=200)
 
     try:
         obs = to_tensors(env.reset(), device)
+        memory = model.initial_state(n, device)
+        starts = torch.ones(n, device=device)
         while update < total_updates:
             update += 1
             if ppo.anneal_lr:
@@ -188,15 +214,18 @@ def main():
             started = time.time()
             finished = []
             model.eval()
+            memory0 = None if memory is None else (memory[0].clone(), memory[1].clone())
             for t in range(horizon):
-                action, log_prob, value = model.act(obs)
+                buffers["starts"][t] = starts
+                action, log_prob, value, memory = model.act(obs, memory, starts)
                 next_obs, reward, terminated, truncated, info = env.step(action.cpu().numpy())
                 reward = torch.as_tensor(reward, device=device)
                 if info["final_obs"]:
                     envs = list(info["final_obs"])
                     final = {k: np.stack([info["final_obs"][e][k] for e in envs]) for k in ("grid", "state")}
+                    final_memory = None if memory is None else (memory[0][envs], memory[1][envs])
                     with torch.no_grad():
-                        _, final_value = model(to_tensors(final, device))
+                        _, final_value, _ = model(to_tensors(final, device), final_memory, torch.zeros(len(envs), device=device))
                     reward[envs] += ppo.gamma * final_value
                 buffers["grid"][t] = obs["grid"]
                 buffers["state"][t] = obs["state"]
@@ -205,6 +234,7 @@ def main():
                 buffers["values"][t] = value
                 buffers["rewards"][t] = reward
                 buffers["dones"][t] = torch.as_tensor(terminated | truncated, device=device, dtype=torch.float32)
+                starts = buffers["dones"][t]
                 obs = to_tensors(next_obs, device)
                 for episode in info["episodes"]:
                     finished.append(episode)
@@ -215,18 +245,14 @@ def main():
             env_steps += n * horizon
 
             with torch.no_grad():
-                _, last_value = model(obs)
+                _, last_value, _ = model(obs, memory, starts)
             advantages, returns = compute_gae(
                 buffers["rewards"], buffers["values"], last_value, buffers["dones"], ppo.gamma, ppo.gae_lambda
             )
             batch = {
-                "grid": buffers["grid"].flatten(0, 1),
-                "state": buffers["state"].flatten(0, 1),
-                "actions": buffers["actions"].flatten(0, 1),
-                "log_probs": buffers["log_probs"].flatten(0, 1),
-                "advantages": advantages.flatten(),
-                "returns": returns.flatten(),
+                key: buffers[key] for key in ("grid", "state", "actions", "log_probs", "starts")
             }
+            batch.update({"advantages": advantages, "returns": returns, "state0": memory0})
             model.train()
             losses = ppo_update(model, optimizer, batch, ppo)
 

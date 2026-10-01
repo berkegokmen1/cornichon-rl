@@ -39,6 +39,12 @@ class PPOConfig:
 
 
 @dataclass
+class ModelConfig:
+    recurrent: bool = False  # LSTM memory; lets the agent remember where it has been
+    hidden: int = 256
+
+
+@dataclass
 class EvalConfig:
     every_updates: int = 50
     episodes: int = 100  # held-out seeds per evaluation, at the current curriculum difficulty
@@ -59,6 +65,7 @@ class TrainConfig:
     wandb_entity: str = "berkegokmen1"
     checkpoint_every: int = 10  # updates
     env: EnvConfig = field(default_factory=EnvConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)
     ppo: PPOConfig = field(default_factory=PPOConfig)
     curriculum: CurriculumConfig = field(default_factory=CurriculumConfig)
     eval: EvalConfig = field(default_factory=EvalConfig)

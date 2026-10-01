@@ -19,7 +19,7 @@ The reward the policy maximises is the sum of the `reward_parts/*` terms.
 **DIAGNOSTICS (logged only, nothing is optimised on them):**
 - `rollout/*`: training episodes that finished during the update (`rollout_window/*` = last 200). **`rollout/success` is the number to watch.**
 - `reward_parts/*`: per-episode sum of each reward term; shows which term drives the return.
-- `eval/*`: greedy policy on 100 **held-out mazes** (seeds ≥ 1,000,000, never trained on) at the current difficulty.
+- `eval/*`: the policy (sampled actions, from v3 on; greedy before) on 100 **held-out mazes** (seeds ≥ 1,000,000, never trained on) at the current difficulty.
   Drops right after a promotion are expected: the difficulty just went up.
 - `eval_sweep/dNN/*`: every 200 updates, 20 held-out mazes at **every** difficulty up to current + 1: shows
   forgetting of easier levels and readiness for the next one. Difficulty = bigger maze, longer route, more enemies
@@ -92,12 +92,14 @@ workspace = ws.Workspace(
                     "reward_parts/death",
                     "reward_parts/path_progress",
                     "reward_parts/mob_killed",
+                    "reward_parts/damage_dealt",
                     "reward_parts/damage",
                     "reward_parts/collected",
                     "reward_parts/step",
                 ),
                 line("path progress shaping", "reward_parts/path_progress"),
-                line("combat: kills and damage taken", "rollout/mobs_killed", "rollout/damage"),
+                line("combat: kills per episode", "rollout/mobs_killed", "eval/mobs_killed"),
+                line("combat: sphere damage dealt vs damage taken", "rollout/damage_dealt", "rollout/damage"),
                 line("potions collected", "rollout/collected"),
                 line("game score (not trained on)", "rollout/score"),
             ],

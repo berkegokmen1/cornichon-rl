@@ -16,6 +16,8 @@ import com.cornichon.models.entities.projectiles.Projectile;
 import com.cornichon.utils.Constants;
 import com.cornichon.views.helpers.DrawableValues;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Arrays;
 import java.util.Locale;
 
@@ -48,6 +50,7 @@ final class Simulation {
   private int difficulty;
   private int frames;
   private int mobsAtStart;
+  private final List<Mob> mobs = new ArrayList<Mob>(); // every mob of the level, dead ones included
   private int collectiblesAtStart;
   private float damageTaken;
 
@@ -69,6 +72,8 @@ final class Simulation {
     frames = 0;
     damageTaken = 0;
     mobsAtStart = countMobs();
+    mobs.clear();
+    for (Entity e : level.getEntities()) if (e instanceof Mob) mobs.add((Mob) e);
     collectiblesAtStart = countCollectibles();
   }
 
@@ -127,13 +132,14 @@ final class Simulation {
     json.append(String.format(
       Locale.US,
       "],\"completed\":%b,\"dead\":%b,\"frames\":%d,\"mobs_killed\":%d,\"collected\":%d,\"damage\":%.1f," +
-      "\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d}",
+      "\"damage_dealt\":%d,\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d}",
       level.isCompleted(),
       player.isDead(),
       frames,
       mobsAtStart - countMobs(),
       collectiblesAtStart - countCollectibles(),
       damageTaken,
+      damageDealt(),
       player.getHealth(),
       level.getLatestScore(),
       playerDoorDistance(),
@@ -302,6 +308,13 @@ final class Simulation {
 
   private static boolean isBrick(int value) {
     return value == DrawableValues.BRICK || value == DrawableValues.BRICK_PLATFORM;
+  }
+
+  /** Sphere damage dealt to mobs so far (a dead mob counts its full health once). */
+  private int damageDealt() {
+    int total = 0;
+    for (Mob m : mobs) total += Constants.MOB_HEALTH_GENERAL - Math.max(0, m.getHealth());
+    return total;
   }
 
   private int countMobs() {

@@ -34,12 +34,16 @@ def play_levels(policy, levels, env_config, reward=RewardConfig(), device="cpu",
     episodes = {}
     try:
         obs = env.reset()
+        memory = None if policy == "random" else policy.initial_state(env.num_envs, device)
+        starts = torch.ones(env.num_envs, device=device)
         while len(episodes) < len(wanted):
             if policy == "random":
                 actions = np.stack([rng.integers(n, size=env.num_envs) for n in ACTION_NVEC], 1)
             else:
-                actions = policy.act(to_tensors(obs, device), greedy=greedy)[0].cpu().numpy()
-            obs, _, _, _, info = env.step(actions)
+                actions, _, _, memory = policy.act(to_tensors(obs, device), memory, starts, greedy=greedy)
+                actions = actions.cpu().numpy()
+            obs, _, terminated, truncated, info = env.step(actions)
+            starts = torch.as_tensor(terminated | truncated, device=device, dtype=torch.float32)
             for episode in info["episodes"]:
                 level = (episode["difficulty"], episode["seed"])
                 if level in wanted:
@@ -51,7 +55,7 @@ def play_levels(policy, levels, env_config, reward=RewardConfig(), device="cpu",
 
 def summarize(episodes):
     summary = {"episodes": len(episodes)}
-    for key in ("success", "death", "timeout", "return", "length", "time_limit", "progress", "mobs_killed", "score"):
+    for key in ("success", "death", "timeout", "return", "length", "time_limit", "progress", "mobs_killed", "damage_dealt", "score"):
         summary[key] = float(np.mean([float(e[key]) for e in episodes]))
     return summary
 
@@ -72,7 +76,8 @@ def sweep(policy, difficulties, seeds, env_config, reward=RewardConfig(), device
 def load_policy(path, device):
     checkpoint = torch.load(path, map_location=device, weights_only=False)
     env_config = EnvConfig(**checkpoint["config"]["env"])
-    model = ActorCritic(env_config.view_height, env_config.view_width).to(device)
+    model_config = checkpoint["config"].get("model", {})  # absent in checkpoints from before the LSTM option
+    model = ActorCritic(env_config.view_height, env_config.view_width, **model_config).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()
     return model, env_config, RewardConfig.from_dict(checkpoint["config"]["reward"])

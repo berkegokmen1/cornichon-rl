@@ -2,7 +2,7 @@ from cornichon_rl.reward import UNREACHABLE, RewardConfig, step_reward
 
 
 def row(**values):
-    base = {"completed": False, "dead": False, "mobs_killed": 0, "damage": 0.0, "collected": 0, "door_distance": 30}
+    base = {"completed": False, "dead": False, "mobs_killed": 0, "damage": 0.0, "damage_dealt": 0, "collected": 0, "door_distance": 30}
     base.update(values)
     return base
 
@@ -27,6 +27,9 @@ def test_events_pay_once_per_occurrence():
     assert parts["level_complete"] == config.level_complete
 
 
-def test_death_outweighs_any_single_step_bonus():
+def test_sphere_hits_pay_on_the_way_to_a_kill():
     config = RewardConfig()
-    assert config.death + config.mob_killed + config.collected < 0
+    _, parts = step_reward(row(damage_dealt=50), row(damage_dealt=75), config)
+    assert parts["damage_dealt"] == config.damage_dealt_per_hp * 25
+    kill = config.mob_killed + 100 * config.damage_dealt_per_hp
+    assert kill * 9 > config.level_complete  # clearing a difficulty-2 maze is worth more than the door, as in the game

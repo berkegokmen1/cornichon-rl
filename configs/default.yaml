@@ -12,6 +12,10 @@ env:
   time_per_tile: 6
   repeat: 4              # 15 decisions per second
 
+model:
+  recurrent: true        # LSTM memory (ppo_curriculum_v2 was feed-forward and got stuck in loops)
+  hidden: 256
+
 ppo:
   total_steps: 50_000_000
   horizon: 128
@@ -34,5 +38,6 @@ eval:
   episodes: 100
   sweep_every_updates: 200
   sweep_episodes: 20
+  greedy: false          # sample actions like in training; the argmax policy froze in loops (26% vs 13% timeouts)
 
 reward: {}   # RewardConfig defaults (cornichon_rl/reward.py)

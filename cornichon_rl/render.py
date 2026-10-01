@@ -54,6 +54,7 @@ def record(model, env_config, seed, difficulty, device, greedy=True, max_steps=N
     frames = []
     try:
         row = service.reset([0], [seed], [difficulty])[0]
+        memory, starts = model.initial_state(1, device), torch.ones(1, device=device)
         limit = max_steps or time_limit(row["door_distance"], env_config.max_steps, env_config.time_base, env_config.time_per_tile)
         for step in range(limit):
             outcome = "door!" if row["completed"] else "died" if row["dead"] else ""
@@ -63,7 +64,8 @@ def record(model, env_config, seed, difficulty, device, greedy=True, max_steps=N
                 break
             obs = observe(row, step, limit, env_config.view_height, env_config.view_width)
             obs = {k: v[None] for k, v in obs.items()}
-            action = model.act(to_tensors(obs, device), greedy=greedy)[0][0].cpu().numpy()
+            action, _, _, memory = model.act(to_tensors(obs, device), memory, starts, greedy=greedy)
+            action, starts = action[0].cpu().numpy(), torch.zeros(1, device=device)
             service.send_step([action], env_config.repeat)
             row = service.read_step()[0]
     finally:
