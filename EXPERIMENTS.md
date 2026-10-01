@@ -39,6 +39,7 @@ logs in `/data/local/berke/cornichon-rl/logs/<name>.log`. W&B: `berkegokmen1/cor
 | 10-01 12:32 | first real-game videos (`cornichon_rl.record`, recorder/): both released agents, unseen mazes d1–d4 × seeds 1000001–2, sampled actions. `~/deliverables/cr_game_videos_oct_01/` | ppo_v4: 7 of 8 reach the door, 0–2 kills each, 1 timeout (d3). Fighter: 4 door, 2 died, 2 timeouts (d3, d4); kills up to 10 of 12 (d2) and 11 of 26 (d4) |
 | 10-01 14:19 | **final benchmark**, 200 held-out mazes per difficulty d1–d8, sampled actions: `game_from_arena_v1` final and best.pt, `ppo_v4_combat` best.pt. `/data/local/berke/cornichon-rl/bench/final/` (cthulhu1) | final: 94/86/85/58/48/35/19/4 success, kills 3.8–13.6. best.pt: 96/84/72/59/51/27/20/4. v4: 91/82/71/42/40/16/9/1, kills 0.8–1.8. Final chosen |
 | 10-01 14:24 | **release**: `weights/cornichon_agent` (= `game_from_arena_v1` final) replaces `cornichon_fighter` (its update-1960 snapshot); `cornichon_ppo_v4` kept as the baseline. README "The agent" section: real-game clips (WebP at 2× + mp4) from 24 filmed unseen levels d1–d6 (19 reached the door, 3 died, 2 timed out; all in `~/deliverables/cr_game_videos_oct_01/`) | |
+| 10-01 14:33 | README visuals: simulator view GIF (unseen d3, door, 7/16 kills), benchmark chart (`scripts/plot_benchmark.py` → `docs/media/benchmark.png`), "Where it fails" with three real-game failures (d5 death, d6 death, d3 timeout). Project wrapped up: no runs left | |
 
 ## Two-phase plan (09-30 23:30, berke's idea)
 

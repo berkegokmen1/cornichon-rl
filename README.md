@@ -15,11 +15,38 @@ train. The original game's README follows the agent section.
 |---|---|
 | ![d1](docs/media/agent_d1_kills.webp) | ![d4](docs/media/agent_d4_kills.webp) |
 | [mp4](docs/media/agent_d1_kills.mp4) | [mp4](docs/media/agent_d4_kills.mp4) |
-| **difficulty 6: 22 of 44 mobs killed, door with 40 HP left** | **a failure: difficulty 5, dies between two fireball-throwing wizards** |
-| ![d6](docs/media/agent_d6_door.webp) | ![d5](docs/media/agent_d5_death.webp) |
-| [mp4](docs/media/agent_d6_door.mp4) | [mp4](docs/media/agent_d5_death.mp4) |
+| **difficulty 2: 10 of 12 mobs killed, door with 25 HP left** | **difficulty 6: 22 of 44 mobs killed, door with 40 HP left** |
+| ![d2](docs/media/agent_d2_kills.webp) | ![d6](docs/media/agent_d6_door.webp) |
+| [mp4](docs/media/agent_d2_kills.mp4) | [mp4](docs/media/agent_d6_door.mp4) |
+
+### Where it fails
+
+Same agent, same unseen mazes. Of the 24 levels filmed (difficulties 1–6, four mazes each) it reached the door in
+19, died in 3 and ran out of time in 2.
+
+| difficulty 5: dies between two fireball-throwing wizards (2 of 26 mobs killed) | difficulty 6: worn down by skeletons, slimes and fireballs in long corridors (14 of 53 killed) |
+|---|---|
+| ![d5 death](docs/media/agent_fail_d5_death.webp) | ![d6 death](docs/media/agent_fail_d6_death.webp) |
+| [mp4](docs/media/agent_fail_d5_death.mp4) | [mp4](docs/media/agent_fail_d6_death.mp4) |
+| **difficulty 3: time runs out at full health, 5 of 23 mobs killed, door never reached** | |
+| ![d3 timeout](docs/media/agent_fail_d3_timeout.webp) | |
+| [mp4](docs/media/agent_fail_d3_timeout.mp4) | |
+
+### What the simulator sees
+
+Training runs the same game code headless, thousands of levels in parallel, with no graphics. The agent observes a
+31×21-tile window around itself: walls, spikes, mobs, wizards, fireballs (and which way they fly), potions, the
+door and its sphere, plus health, mana, velocity and the direction and path distance to the door. Below is the
+whole simulated level drawn from that state: an unseen difficulty-3 maze where it kills 7 of 16 mobs and reaches
+the door (the agent is the small green box with a black outline and the purple dot is its sphere; green squares are mobs,
+purple squares wizards, orange fireballs, red and blue potions, grey spikes, and brown the door).
+
+![simulator view](docs/media/agent_sim_d3.gif)
 
 ### Results
+
+![benchmark](docs/media/benchmark.png)
+
 
 Benchmark: 200 unseen mazes per difficulty (seeds 1,000,000 and up; training uses seeds below 100,000), actions
 sampled from the policy. Each cell is **success** / death / timeout in %, then mobs killed per level.
