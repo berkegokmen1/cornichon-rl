@@ -38,6 +38,7 @@ git clone https://github.com/berkegokmen1/cornichon-rl.git && cd cornichon-rl
 ./gradlew :headless:installDist                  # the real game code, built as a headless simulator
 python -m venv .venv && . .venv/bin/activate
 pip install -e .                                 # torch, gymnasium, numpy, pillow, ...
+# (Ubuntu without python3-venv: `sudo apt install python3-venv`, or `uv venv .venv && uv pip install -e .`)
 
 # win rate on 100 unseen mazes at difficulties 1-3
 python -m cornichon_rl.evaluate --checkpoint weights/cornichon_fighter.pt --difficulties 1 2 3 --episodes 100 --stochastic
