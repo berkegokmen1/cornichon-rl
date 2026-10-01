@@ -11,6 +11,7 @@ public final class LevelWriter {
 
   public Maze maze;
   private int difficulty;
+  private int monsterDifficulty; // sets mob and potion density; equals difficulty in the game
   private Random random;
 
   public LevelWriter(int difficulty) {
@@ -18,8 +19,14 @@ public final class LevelWriter {
   }
 
   public LevelWriter(int difficulty, long seed) {
+    this(difficulty, difficulty, seed);
+  }
+
+  /** Maze size from difficulty, mob/potion density from monsterDifficulty (RL training uses denser mazes). */
+  public LevelWriter(int difficulty, int monsterDifficulty, long seed) {
     int d = difficulty + 6;
     this.difficulty = difficulty;
+    this.monsterDifficulty = monsterDifficulty;
     this.random = new Random(seed ^ 0x9e3779b97f4a7c15L);
     this.maze = new Maze(d, d * 7 / 10, seed);
   }
@@ -80,8 +87,8 @@ public final class LevelWriter {
                 if (collectibleCount > 3) collectibleTestModifier = 12;
                 if (collectibleCount > 5) collectibleTestModifier = 16;
 
-                boolean testCollectible = random.nextInt(difficulty / 2 + collectibleTestModifier) == 0; // the chance of placing decreases with the difficulty
-                boolean testMob = random.nextInt(mobTestModifier - difficulty / 2) == 0; // the chance of placing increases with the difficulty
+                boolean testCollectible = random.nextInt(monsterDifficulty / 2 + collectibleTestModifier) == 0; // the chance of placing decreases with the difficulty
+                boolean testMob = random.nextInt(mobTestModifier - monsterDifficulty / 2) == 0; // the chance of placing increases with the difficulty
 
                 if (testMob) {
                   int mobValue = mobs[random.nextInt(mobs.length)];

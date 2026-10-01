@@ -1,7 +1,8 @@
 """Cornichon as an RL environment.
 
 Observation (dict):
-  grid  (8, H, W) 0/1 channels around the player (GRID_CHANNELS), player at the centre cell, row 0 at the top.
+  grid  (10, H, W) 0/1 channels around the player (GRID_CHANNELS, incl. the sphere and which way each fireball
+        flies), player at the centre cell, row 0 at the top.
   state (17,)     Simulation.state() (velocities, health, mana, grounded, sphere offset/velocity, buff, door offset,
                   path distance, difficulty, sub-cell position) + fraction of the time limit used.
 Action: MultiDiscrete(ACTION_NVEC), each decision held for `repeat` game frames (60 fps; repeat 4 -> 15 Hz).
@@ -50,6 +51,7 @@ def episode_summary(row, steps, limit, episode_return, parts, start_distance):
         "death": bool(row["dead"]),
         "timeout": not (row["completed"] or row["dead"]),
         "difficulty": row["difficulty"],
+        "monster_difficulty": row["monster_difficulty"],
         "seed": row["seed"],
         "mobs_killed": row["mobs_killed"],
         "damage_dealt": row["damage_dealt"],
@@ -66,7 +68,7 @@ def episode_summary(row, steps, limit, episode_return, parts, start_distance):
 class VecCornichon:
     """num_envs levels spread over several simulator processes that step in parallel; resets finished levels.
 
-    next_level(env_index) -> (difficulty, seed) chooses the level for each new episode.
+    next_level(env_index) -> (difficulty, seed) or (difficulty, seed, monster_difficulty) chooses each new level.
     """
 
     def __init__(
@@ -130,10 +132,11 @@ class VecCornichon:
         by_service = {}
         for env in envs:
             service, local = self._locate(env)
-            difficulty, seed = self.next_level(env)
-            by_service.setdefault(id(service), (service, []))[1].append((env, local, difficulty, seed))
+            difficulty, seed, *monsters = self.next_level(env)
+            monster_difficulty = monsters[0] if monsters else difficulty
+            by_service.setdefault(id(service), (service, []))[1].append((env, local, difficulty, seed, monster_difficulty))
         for service, items in by_service.values():
-            rows = service.reset([i[1] for i in items], [i[3] for i in items], [i[2] for i in items])
+            rows = service.reset([i[1] for i in items], [i[3] for i in items], [i[2] for i in items], [i[4] for i in items])
             for (env, *_), row in zip(items, rows):
                 self.rows[env] = row
                 self.steps[env] = 0

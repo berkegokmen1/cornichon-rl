@@ -4,7 +4,7 @@ from cornichon_rl.model import ActorCritic
 
 
 def random_obs(*lead):
-    return {"grid": (torch.rand(*lead, 8, 21, 31) > 0.8).float(), "state": torch.randn(*lead, 17)}
+    return {"grid": (torch.rand(*lead, 10, 21, 31) > 0.8).float(), "state": torch.randn(*lead, 17)}
 
 
 def test_sequence_replay_matches_step_by_step_acting():

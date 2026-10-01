@@ -239,7 +239,7 @@ def main():
                 for episode in info["episodes"]:
                     finished.append(episode)
                     recent.append(episode)
-                    if curriculum.record(episode["difficulty"], episode["success"]):
+                    if curriculum.record(episode["difficulty"], episode["success"], episode["monster_difficulty"]):
                         print(f"update {update}: curriculum promoted to difficulty {curriculum.difficulty}", flush=True)
             rollout_seconds = time.time() - started
             env_steps += n * horizon

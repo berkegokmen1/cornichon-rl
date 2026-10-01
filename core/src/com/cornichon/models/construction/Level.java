@@ -64,6 +64,11 @@ public class Level {
     this(difficulty, lastScore, lastHealth, game, new Map(difficulty, seed));
   }
 
+  /** Seeded level whose mob/potion density comes from monsterDifficulty instead of difficulty (RL training). */
+  public Level(int difficulty, int monsterDifficulty, float lastHealth, long seed) {
+    this(difficulty, 0, lastHealth, null, new Map(difficulty, monsterDifficulty, seed));
+  }
+
   private Level(int difficulty, int lastScore, float lastHealth, Cornichon game, Map map) {
     // this.sphere = player.getSphere();
     this.game = game;

@@ -28,7 +28,9 @@ Python runs several services (default 16 levels each) and steps them concurrentl
 
 ## Observation, action
 
-* `grid` 8×21×31 (channels: wall, spikes, mob, wizard, projectile, health potion, mana potion, door), centred on the player.
+* `grid` 10×21×31 (channels: wall, spikes, mob, wizard, projectile, health potion, mana potion, door, sphere,
+  fireball flying right), centred on the player. The last two arrived in v4 (`--grid-bytes=2`); older checkpoints
+  read the first 8 channels and older clients still get one byte per cell.
 * `state` 17: player velocity, health, mana, grounded, sphere offset and velocity, buffed, door offset, shortest-path
   distance to door, difficulty, sub-cell position, fraction of time limit used.
 * Action `MultiDiscrete([3,2,2,3,3])`: move none/left/right, jump (a key press: first frame only), spell
@@ -61,6 +63,10 @@ What difficulty changes (`LevelWriter`, mean over 20 mazes):
 | 7 | 53×37 | 133 | 38 | 13 | 13 | 8 |
 | 9 | 61×41 | 163 | 67 | 25 | 23 | 7 |
 | 10 | 65×45 | 175 | 131 | 53 | 46 | 0 |
+
+**Combat practice (training only, v4):** `monster_practice` of training levels keep their maze but get the mob and
+potion density of 1–3 difficulties higher (`LevelWriter(difficulty, monsterDifficulty, seed)`), so fighting pays off
+long before the big levels. These episodes never count toward promotion; evaluation always uses the real game.
 
 Difficulty 10 places a mob on every free floor spot (mob chance `1/(6 − d/2)` = 1), so no potions: the original
 game's final level.

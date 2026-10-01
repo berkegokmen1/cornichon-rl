@@ -77,7 +77,8 @@ def load_policy(path, device):
     checkpoint = torch.load(path, map_location=device, weights_only=False)
     env_config = EnvConfig(**checkpoint["config"]["env"])
     model_config = checkpoint["config"].get("model", {})  # absent in checkpoints from before the LSTM option
-    model = ActorCritic(env_config.view_height, env_config.view_width, **model_config).to(device)
+    grid_channels = checkpoint["model"]["grid.0.weight"].shape[1]  # 8 before v4 added the sphere/fireball channels
+    model = ActorCritic(env_config.view_height, env_config.view_width, grid_channels=grid_channels, **model_config).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()
     return model, env_config, RewardConfig.from_dict(checkpoint["config"]["reward"])

@@ -16,7 +16,8 @@ class RewardConfig:
     # the agent learned to run past every mob (0.2 kills/episode of ~9 at difficulty 2) and most deaths were mobs.
     mob_killed: float = 2.0
     damage_dealt_per_hp: float = 0.01  # sphere hits; a 100 HP mob pays 1 over its 4 hits, so ~3 per kill in total
-    damage_per_hp: float = -0.01  # losing all 100 HP costs 1, on top of the death penalty
+    # Taking hits must cost more than killing the mob pays: a skeleton hit (20 HP) is -0.6 against ~3 per kill.
+    damage_per_hp: float = -0.03
     collected: float = 0.1  # health or mana potion
     step: float = -0.001  # per agent decision
     # Progress shaping: + per tile the shortest path to the door gets shorter, - per tile it gets longer. It

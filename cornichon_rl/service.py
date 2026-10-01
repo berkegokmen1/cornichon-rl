@@ -15,7 +15,10 @@ REPO = Path(__file__).resolve().parent.parent
 LAUNCHER = REPO / "headless" / "build" / "install" / "headless" / "bin" / "headless"
 
 # Bit order of the grid bytes, matching Simulation.java.
-GRID_CHANNELS = ("wall", "spikes", "mob", "wizard", "projectile", "health_potion", "mana_potion", "door")
+GRID_CHANNELS = (
+    "wall", "spikes", "mob", "wizard", "projectile", "health_potion", "mana_potion", "door",
+    "sphere", "projectile_rightward",  # second grid byte; models from before v4 use only the first 8 channels
+)
 
 # Action heads: move (none/left/right), jump, spell, sphere x (none/left/right), sphere y (none/up/down).
 ACTION_NVEC = (3, 2, 2, 3, 3)
@@ -32,7 +35,7 @@ class SimService:
             raise FileNotFoundError(f"{launcher} missing; build it with ./gradlew :headless:installDist")
         self.num_envs = num_envs
         self.proc = subprocess.Popen(
-            [str(launcher), f"--envs={num_envs}", f"--view-width={view_width}", f"--view-height={view_height}"],
+            [str(launcher), f"--envs={num_envs}", f"--view-width={view_width}", f"--view-height={view_height}", "--grid-bytes=2"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -60,13 +63,16 @@ class SimService:
         self._send(request)
         return self._read()
 
-    def reset(self, ids, seeds, difficulties):
+    def reset(self, ids, seeds, difficulties, monster_difficulties=None):
+        """monster_difficulties: mob/potion density per level (training only); defaults to each level's difficulty."""
         request = {
             "op": "reset",
             "ids": [int(i) for i in ids],
             "seeds": [int(s) for s in seeds],
             "difficulties": [int(d) for d in difficulties],
         }
+        if monster_difficulties is not None:
+            request["monster_difficulties"] = [int(m) for m in monster_difficulties]
         return self.call(request)["envs"]
 
     # step is split in two so several services can simulate at the same time (see VecCornichon.step).
@@ -91,8 +97,13 @@ class SimService:
                 stream.close()
 
 
+def grid_cells(encoded, height, width):
+    """Base64 grid (two little-endian bytes per cell) -> (height, width) int bitmask, bits in GRID_CHANNELS order."""
+    return np.frombuffer(base64.b64decode(encoded), dtype="<u2").reshape(height, width).astype(np.int32)
+
+
 def decode_grid(row, height, width):
     """Base64 bitmask grid -> float32 array (channels, height, width), channel order GRID_CHANNELS."""
-    cells = np.frombuffer(base64.b64decode(row["grid"]), dtype=np.uint8).reshape(height, width)
-    bits = np.unpackbits(cells[None], axis=0, bitorder="little")
-    return bits.astype(np.float32)
+    cells = grid_cells(row["grid"], height, width)
+    shifts = np.arange(len(GRID_CHANNELS)).reshape(-1, 1, 1)
+    return ((cells[None] >> shifts) & 1).astype(np.float32)

@@ -32,6 +32,8 @@ curriculum:
   promote_at: 0.8
   window: 200
   replay: 0.2
+  monster_practice: 0.5  # half the training levels get mobs of 1-3 difficulties higher (combat practice)
+  monster_boost: 3
 
 eval:
   every_updates: 50

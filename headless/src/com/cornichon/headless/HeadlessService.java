@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
  *
  * <pre>
  * {"op":"reset","ids":[0,3],"seeds":[17,42],"difficulties":[1,1]}  -> {"envs":[...]} for those ids
+ *   optional "monster_difficulties":[4,1] (mob density); start with --grid-bytes=2 for sphere/fireball channels
  * {"op":"step","actions":[[m,j,s,sx,sy], ...one per env],"repeat":4} -> {"envs":[...]} for all envs
  * {"op":"snapshot","id":0}                                           -> whole-level grid for env 0
  * {"op":"close"}                                                     -> {"ok":true}, then exit
@@ -26,11 +27,12 @@ import java.nio.charset.StandardCharsets;
 public final class HeadlessService {
 
   public static void main(String[] args) throws Exception {
-    int envs = 1, viewWidth = 31, viewHeight = 21;
+    int envs = 1, viewWidth = 31, viewHeight = 21, gridBytes = 1;
     for (String arg : args) {
       if (arg.startsWith("--envs=")) envs = Integer.parseInt(arg.substring(7));
       if (arg.startsWith("--view-width=")) viewWidth = Integer.parseInt(arg.substring(13));
       if (arg.startsWith("--view-height=")) viewHeight = Integer.parseInt(arg.substring(14));
+      if (arg.startsWith("--grid-bytes=")) gridBytes = Integer.parseInt(arg.substring(13));
     }
 
     // stdout carries the protocol; anything the game code prints goes to stderr instead.
@@ -40,8 +42,8 @@ public final class HeadlessService {
 
     Simulation[] sims = new Simulation[envs];
     for (int i = 0; i < envs; i++) {
-      sims[i] = new Simulation(viewWidth, viewHeight);
-      sims[i].reset(i, 1);
+      sims[i] = new Simulation(viewWidth, viewHeight, gridBytes);
+      sims[i].reset(i, 1, 1);
     }
     protocol.println(String.format(
       "{\"ready\":true,\"envs\":%d,\"view_width\":%d,\"view_height\":%d,\"state_size\":%d}",
@@ -62,7 +64,9 @@ public final class HeadlessService {
           int[] ids = request.get("ids").asIntArray();
           long[] seeds = request.get("seeds").asLongArray();
           int[] difficulties = request.get("difficulties").asIntArray();
-          for (int i = 0; i < ids.length; i++) sims[ids[i]].reset(seeds[i], difficulties[i]);
+          // optional: denser mobs than the maze size implies (training only); defaults to the game's density
+          int[] monsters = request.has("monster_difficulties") ? request.get("monster_difficulties").asIntArray() : difficulties;
+          for (int i = 0; i < ids.length; i++) sims[ids[i]].reset(seeds[i], difficulties[i], monsters[i]);
           response = envsJson(sims, ids);
         } else if (op.equals("step")) {
           JsonValue actions = request.get("actions");

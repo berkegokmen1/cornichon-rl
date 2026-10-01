@@ -40,3 +40,15 @@ def test_sweep_reports_every_difficulty():
     result = sweep("random", [1, 2, 3], eval_seeds(2), EnvConfig(max_steps=20, envs_per_service=4))
     assert sorted(result) == [1, 2, 3]
     assert all(r["episodes"] == 2 and r["success"] + r["death"] + r["timeout"] == 1 for r in result.values())
+
+
+def test_monster_practice_levels_never_promote():
+    curriculum = Curriculum(CurriculumConfig(window=5, monster_practice=1.0), np.random.default_rng(0))
+    difficulty, _, monsters = curriculum.sample()
+    assert monsters > difficulty
+    for _ in range(20):
+        curriculum.record(1, True, monster_difficulty=3)
+    assert curriculum.difficulty == 1
+    for _ in range(5):
+        curriculum.record(1, True, monster_difficulty=1)
+    assert curriculum.difficulty == 2

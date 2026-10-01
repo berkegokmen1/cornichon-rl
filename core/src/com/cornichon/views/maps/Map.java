@@ -14,8 +14,12 @@ public class Map {
 
   /** Same level every time for the same (difficulty, seed). */
   public Map(int difficulty, long seed) {
+    this(difficulty, difficulty, seed);
+  }
+
+  public Map(int difficulty, int monsterDifficulty, long seed) {
     this.map = new int[70][100];
-    this.levelWriter = new LevelWriter(difficulty, seed);
+    this.levelWriter = new LevelWriter(difficulty, monsterDifficulty, seed);
   }
 
   public void processMap() {

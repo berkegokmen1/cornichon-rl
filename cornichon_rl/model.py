@@ -20,12 +20,13 @@ def _init(layer, gain=np.sqrt(2)):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, view_height=21, view_width=31, state_size=17, hidden=256, recurrent=False):
+    def __init__(self, view_height=21, view_width=31, state_size=17, hidden=256, recurrent=False, grid_channels=None):
         super().__init__()
+        self.grid_channels = grid_channels or len(GRID_CHANNELS)
         self.recurrent = recurrent
         self.hidden = hidden
         self.grid = nn.Sequential(
-            _init(nn.Conv2d(len(GRID_CHANNELS), 32, 3, padding=1)),
+            _init(nn.Conv2d(self.grid_channels, 32, 3, padding=1)),
             nn.ReLU(),
             _init(nn.Conv2d(32, 64, 3, stride=2, padding=1)),
             nn.ReLU(),
@@ -34,7 +35,7 @@ class ActorCritic(nn.Module):
             nn.Flatten(),
         )
         with torch.no_grad():
-            grid_features = self.grid(torch.zeros(1, len(GRID_CHANNELS), view_height, view_width)).shape[1]
+            grid_features = self.grid(torch.zeros(1, self.grid_channels, view_height, view_width)).shape[1]
         self.state = nn.Sequential(_init(nn.Linear(state_size, 64)), nn.ReLU())
         self.trunk = nn.Sequential(
             _init(nn.Linear(grid_features + 64, hidden)),
@@ -60,7 +61,8 @@ class ActorCritic(nn.Module):
         return zeros, zeros.clone()
 
     def _encode(self, obs):
-        return self.trunk(torch.cat([self.grid(obs["grid"]), self.state(obs["state"])], dim=1))
+        grid = obs["grid"][:, : self.grid_channels]  # channels are only ever appended, so older models read a prefix
+        return self.trunk(torch.cat([self.grid(grid), self.state(obs["state"])], dim=1))
 
     def _memory(self, x, state, starts):
         if not self.recurrent:

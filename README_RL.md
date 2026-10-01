@@ -15,6 +15,7 @@ Python (cornichon_rl/)                            Java (headless/)
 ```bash
 sudo apt-get install -y openjdk-17-jdk-headless
 GRADLE_USER_HOME=/data/local/berke/cache/gradle ./gradlew :headless:installDist --no-daemon
+scripts/install_simulator.sh     # later rebuilds: tests the new simulator, then swaps it in under running trainings
 uv venv --python 3.12 /opt/berke/envs/cornichon-rl
 uv pip install --python /opt/berke/envs/cornichon-rl/bin/python -e '.[dev]' \
   --index-url https://download.pytorch.org/whl/cu128 --extra-index-url https://pypi.org/simple

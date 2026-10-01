@@ -33,12 +33,15 @@ final class Simulation {
   // One bit per grid channel; Python unpacks them in the same order (cornichon_rl/service.py).
   static final int WALL = 1, SPIKES = 1 << 1, MOB = 1 << 2, WIZARD = 1 << 3;
   static final int PROJECTILE = 1 << 4, HEALTH_POTION = 1 << 5, MANA_POTION = 1 << 6, DOOR = 1 << 7;
+  // Second byte, sent only with --grid-bytes=2 (older clients get the first byte, unchanged).
+  static final int SPHERE = 1 << 8, PROJECTILE_RIGHTWARD = 1 << 9;
 
   static final int STATE_SIZE = 16;
   static final int UNREACHABLE = Integer.MAX_VALUE;
 
   private final int viewWidth;
   private final int viewHeight;
+  private final int gridBytes;
   private final ControlInput input = new ControlInput();
 
   private Level level;
@@ -48,24 +51,27 @@ final class Simulation {
 
   private long seed;
   private int difficulty;
+  private int monsterDifficulty;
   private int frames;
   private int mobsAtStart;
   private final List<Mob> mobs = new ArrayList<Mob>(); // every mob of the level, dead ones included
   private int collectiblesAtStart;
   private float damageTaken;
 
-  Simulation(int viewWidth, int viewHeight) {
+  Simulation(int viewWidth, int viewHeight, int gridBytes) {
     this.viewWidth = viewWidth;
     this.viewHeight = viewHeight;
+    this.gridBytes = gridBytes;
   }
 
-  void reset(long seed, int difficulty) {
+  void reset(long seed, int difficulty, int monsterDifficulty) {
     if (level != null) {
       level.dispose();
     }
     this.seed = seed;
     this.difficulty = difficulty;
-    level = new Level(difficulty, 0, Constants.PLAYER_HEALTH, null, seed);
+    this.monsterDifficulty = monsterDifficulty;
+    level = new Level(difficulty, monsterDifficulty, Constants.PLAYER_HEALTH, seed);
     controller = new PlayerController(level);
     map = level.getMap().getMapIntArr();
     doorDistance = distancesToDoor();
@@ -123,7 +129,7 @@ final class Simulation {
   String toJson() {
     Player player = level.getPlayer();
     StringBuilder json = new StringBuilder(4096);
-    json.append("{\"grid\":\"").append(java.util.Base64.getEncoder().encodeToString(view())).append("\",\"state\":[");
+    json.append("{\"grid\":\"").append(java.util.Base64.getEncoder().encodeToString(encode(view()))).append("\",\"state\":[");
     float[] state = state();
     for (int i = 0; i < state.length; i++) {
       if (i > 0) json.append(',');
@@ -132,7 +138,7 @@ final class Simulation {
     json.append(String.format(
       Locale.US,
       "],\"completed\":%b,\"dead\":%b,\"frames\":%d,\"mobs_killed\":%d,\"collected\":%d,\"damage\":%.1f," +
-      "\"damage_dealt\":%d,\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d}",
+      "\"damage_dealt\":%d,\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d,\"monster_difficulty\":%d}",
       level.isCompleted(),
       player.isDead(),
       frames,
@@ -146,7 +152,8 @@ final class Simulation {
       player.getBody().getPosition().x,
       player.getBody().getPosition().y,
       seed,
-      difficulty
+      difficulty,
+      monsterDifficulty
     ));
     return json.toString();
   }
@@ -164,10 +171,10 @@ final class Simulation {
       }
     }
     int height = maxRow + 1, width = maxCol + 1;
-    byte[] grid = new byte[height * width];
+    int[] grid = new int[height * width];
     for (int r = 0; r < height; r++) {
       for (int c = 0; c < width; c++) {
-        grid[r * width + c] = (byte) staticCell(c, rows - 1 - r);
+        grid[r * width + c] = staticCell(c, rows - 1 - r);
       }
     }
     addEntities(grid, width, height, 0, rows - 1);
@@ -176,7 +183,7 @@ final class Simulation {
     return String.format(
       Locale.US,
       "{\"grid\":\"%s\",\"width\":%d,\"height\":%d,\"top_y\":%d,\"player\":[%.3f,%.3f],\"sphere\":[%.3f,%.3f]}",
-      java.util.Base64.getEncoder().encodeToString(grid),
+      java.util.Base64.getEncoder().encodeToString(encode(grid)),
       width,
       height,
       rows - 1,
@@ -187,14 +194,24 @@ final class Simulation {
     );
   }
 
-  private byte[] view() {
+  /** One byte per cell, or two (little-endian) with --grid-bytes=2. */
+  private byte[] encode(int[] grid) {
+    byte[] out = new byte[grid.length * gridBytes];
+    for (int i = 0; i < grid.length; i++) {
+      out[i * gridBytes] = (byte) grid[i];
+      if (gridBytes == 2) out[i * 2 + 1] = (byte) (grid[i] >> 8);
+    }
+    return out;
+  }
+
+  private int[] view() {
     Vector2 p = level.getPlayer().getBody().getPosition();
     int left = Math.round(p.x) - viewWidth / 2;
     int top = Math.round(p.y) + viewHeight / 2;
-    byte[] grid = new byte[viewWidth * viewHeight];
+    int[] grid = new int[viewWidth * viewHeight];
     for (int r = 0; r < viewHeight; r++) {
       for (int c = 0; c < viewWidth; c++) {
-        grid[r * viewWidth + c] = (byte) staticCell(left + c, top - r);
+        grid[r * viewWidth + c] = staticCell(left + c, top - r);
       }
     }
     addEntities(grid, viewWidth, viewHeight, left, top);
@@ -214,7 +231,7 @@ final class Simulation {
   }
 
   /** Mobs, potions, projectiles and the door, at the cell their body centre rounds to. */
-  private void addEntities(byte[] grid, int width, int height, int left, int top) {
+  private void addEntities(int[] grid, int width, int height, int left, int top) {
     for (Entity e : level.getEntities()) {
       int bit;
       if (e instanceof Wizard) bit = WIZARD; else if (e instanceof Mob) bit = MOB; else if (
@@ -223,12 +240,14 @@ final class Simulation {
       mark(grid, width, height, left, top, e.getBody().getPosition(), bit);
     }
     for (Projectile p : level.getProjectiles()) {
-      mark(grid, width, height, left, top, p.getBody().getPosition(), PROJECTILE);
+      int bits = PROJECTILE | (p.getBody().getLinearVelocity().x > 0 ? PROJECTILE_RIGHTWARD : 0);
+      mark(grid, width, height, left, top, p.getBody().getPosition(), bits);
     }
     mark(grid, width, height, left, top, level.getDoor().getBody().getPosition(), DOOR);
+    mark(grid, width, height, left, top, level.getSphere().getBody().getPosition(), SPHERE);
   }
 
-  private static void mark(byte[] grid, int width, int height, int left, int top, Vector2 at, int bit) {
+  private static void mark(int[] grid, int width, int height, int left, int top, Vector2 at, int bit) {
     int c = Math.round(at.x) - left;
     int r = top - Math.round(at.y);
     if (r >= 0 && r < height && c >= 0 && c < width) {

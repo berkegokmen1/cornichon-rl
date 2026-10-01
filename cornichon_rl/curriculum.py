@@ -22,6 +22,10 @@ class CurriculumConfig:
     window: int = 200  # episodes at the current difficulty that the success rate is computed over
     replay: float = 0.2  # fraction of episodes at an easier difficulty, once there is one
     train_seed_count: int = 100_000
+    # Combat practice: this fraction of training levels keeps the maze size but gets the mob density of 1..monster_boost
+    # difficulties higher, so fighting is needed long before the large levels. Promotion counts only real game levels.
+    monster_practice: float = 0.0
+    monster_boost: int = 3
 
 
 class Curriculum:
@@ -34,15 +38,20 @@ class Curriculum:
         self.recent = deque(maxlen=config.window)
 
     def sample(self):
-        """(difficulty, seed) for a new training episode."""
+        """(difficulty, seed, monster_difficulty) for a new training episode."""
         difficulty = self.difficulty
         if difficulty > self.config.start and self.rng.random() < self.config.replay:
             difficulty = int(self.rng.integers(self.config.start, self.difficulty))
-        return difficulty, int(self.rng.integers(self.config.train_seed_count))
+        seed = int(self.rng.integers(self.config.train_seed_count))
+        monsters = difficulty
+        if self.rng.random() < self.config.monster_practice:
+            monsters = min(10, difficulty + int(self.rng.integers(1, self.config.monster_boost + 1)))
+        return difficulty, seed, monsters
 
-    def record(self, difficulty, success):
-        """Count a finished episode; returns True when this promoted the curriculum."""
-        if difficulty != self.difficulty:
+    def record(self, difficulty, success, monster_difficulty=None):
+        """Count a finished episode; returns True when this promoted the curriculum. Practice levels (denser mobs
+        than the game) do not count."""
+        if difficulty != self.difficulty or (monster_difficulty is not None and monster_difficulty != difficulty):
             return False
         self.recent.append(bool(success))
         if (

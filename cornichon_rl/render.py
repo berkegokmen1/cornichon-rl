@@ -14,7 +14,7 @@ from .curriculum import eval_seeds
 from .env import observe, time_limit
 from .evaluate import load_policy
 from .model import to_tensors
-from .service import SimService
+from .service import SimService, grid_cells
 
 CELL = 24
 COLORS = {  # bit -> RGB, drawn in this order (later wins)
@@ -31,7 +31,7 @@ COLORS = {  # bit -> RGB, drawn in this order (later wins)
 
 def draw(snapshot, caption):
     w, h = snapshot["width"], snapshot["height"]
-    grid = np.frombuffer(base64.b64decode(snapshot["grid"]), np.uint8).reshape(h, w)
+    grid = grid_cells(snapshot["grid"], h, w)
     image = Image.new("RGB", (w * CELL, h * CELL + 22), (245, 243, 236))
     pen = ImageDraw.Draw(image)
     for bit, color in COLORS.items():

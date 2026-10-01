@@ -26,14 +26,14 @@ from cornichon_rl.curriculum import eval_seeds  # noqa: E402
 from cornichon_rl.env import observe, time_limit  # noqa: E402
 from cornichon_rl.evaluate import load_policy  # noqa: E402
 from cornichon_rl.model import to_tensors  # noqa: E402
-from cornichon_rl.service import SimService  # noqa: E402
+from cornichon_rl.service import SimService, grid_cells  # noqa: E402
 
 TAIL = 150
 
 
 def door_field(snapshot):
     h, w = snapshot["height"], snapshot["width"]
-    grid = np.frombuffer(base64.b64decode(snapshot["grid"]), np.uint8).reshape(h, w)
+    grid = grid_cells(snapshot["grid"], h, w)
     wall = (grid & 1) > 0
     door = tuple(np.argwhere(grid & 128)[0])
     dist = np.full((h, w), np.inf)
