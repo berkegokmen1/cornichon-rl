@@ -1,0 +1,88 @@
+{
+ "run": "game_from_arena_v1",
+ "wandb": "berkegokmen1/cornichon-rl/runs/93dqemq2",
+ "commit": "57234aa",
+ "update": 3051,
+ "env_steps": 49987584,
+ "curriculum_difficulty": 4,
+ "grid_channels": 10,
+ "state_size": 17,
+ "notes": "Release agent. Two-phase training: arena_v1 (door closed, kill every mob; 30M steps) then the full game curriculum (configs/default.yaml, 50M steps), final checkpoint. Beats cornichon_ppo_v4 at every difficulty with 5-8x more kills.",
+ "benchmark": {
+  "what": "held-out levels (seeds from 1,000,000), sampled actions, evaluate.py --stochastic",
+  "per_difficulty": [
+   {
+    "difficulty": 1,
+    "episodes": 200,
+    "success": 0.935,
+    "death": 0.055,
+    "timeout": 0.01,
+    "mobs_killed": 3.84,
+    "kill_fraction": 0.5729801864801864
+   },
+   {
+    "difficulty": 2,
+    "episodes": 200,
+    "success": 0.86,
+    "death": 0.075,
+    "timeout": 0.065,
+    "mobs_killed": 5.535,
+    "kill_fraction": 0.4982120428591017
+   },
+   {
+    "difficulty": 3,
+    "episodes": 200,
+    "success": 0.85,
+    "death": 0.095,
+    "timeout": 0.055,
+    "mobs_killed": 6.565,
+    "kill_fraction": 0.4589423733506887
+   },
+   {
+    "difficulty": 4,
+    "episodes": 200,
+    "success": 0.58,
+    "death": 0.27,
+    "timeout": 0.15,
+    "mobs_killed": 9.005,
+    "kill_fraction": 0.38281248607419366
+   },
+   {
+    "difficulty": 5,
+    "episodes": 200,
+    "success": 0.475,
+    "death": 0.325,
+    "timeout": 0.2,
+    "mobs_killed": 9.335,
+    "kill_fraction": 0.3622483145047653
+   },
+   {
+    "difficulty": 6,
+    "episodes": 200,
+    "success": 0.35,
+    "death": 0.41,
+    "timeout": 0.24,
+    "mobs_killed": 11.76,
+    "kill_fraction": 0.28821662899101275
+   },
+   {
+    "difficulty": 7,
+    "episodes": 200,
+    "success": 0.19,
+    "death": 0.505,
+    "timeout": 0.305,
+    "mobs_killed": 11.745,
+    "kill_fraction": 0.2370470965804671
+   },
+   {
+    "difficulty": 8,
+    "episodes": 200,
+    "success": 0.045,
+    "death": 0.69,
+    "timeout": 0.265,
+    "mobs_killed": 13.555,
+    "kill_fraction": 0.17760248374820925
+   }
+  ]
+ }
+}

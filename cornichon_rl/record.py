@@ -3,7 +3,7 @@
 Runs the recorder (recorder/, the training simulator inside a libGDX window) and drives it with the policy exactly
 like evaluation does. Needs Java, ffmpeg and a display; with no $DISPLAY it starts one with xvfb-run.
 
-  python -m cornichon_rl.record --checkpoint weights/cornichon_fighter.pt --difficulty 2 --seeds 1000000 --out-dir videos/
+  python -m cornichon_rl.record --checkpoint weights/cornichon_agent.pt --difficulty 2 --seeds 1000000 --out-dir videos/
 """
 
 import argparse

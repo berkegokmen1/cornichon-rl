@@ -6,32 +6,50 @@ trained on the real game code (the same Java/libGDX/Box2D code as the desktop bu
 on procedurally generated mazes it has never seen. See **[README_RL.md](README_RL.md)** for how it works and how to
 train. The original game's README follows the agent section.
 
-## Pretrained agents
+## The agent
 
-Two trained policies ship in [`weights/`](weights/) (5.8 MB each). Each has a model card (`.json`) that says
-which run it came from and how it scored. Both are playing a held-out difficulty-2 maze below, one they never saw
-in training:
+`weights/cornichon_agent.pt` (5.8 MB) playing the actual game, on mazes it never saw in training. The clips run at
+2× speed; the real-time mp4s are linked under each one.
 
-| `cornichon_ppo_v4`: best at reaching the door | `cornichon_fighter`: arena combat pretraining, then the game |
+| difficulty 1: 5 of 10 mobs killed, door at full health | difficulty 4: 14 of 22 mobs killed, then the door |
 |---|---|
-| ![ppo_v4](docs/media/cornichon_ppo_v4.gif) | ![fighter](docs/media/cornichon_fighter.gif) |
+| ![d1](docs/media/agent_d1_kills.webp) | ![d4](docs/media/agent_d4_kills.webp) |
+| [mp4](docs/media/agent_d1_kills.mp4) | [mp4](docs/media/agent_d4_kills.mp4) |
+| **difficulty 6: 22 of 44 mobs killed, door with 40 HP left** | **a failure: difficulty 5, dies between two fireball-throwing wizards** |
+| ![d6](docs/media/agent_d6_door.webp) | ![d5](docs/media/agent_d5_death.webp) |
+| [mp4](docs/media/agent_d6_door.mp4) | [mp4](docs/media/agent_d5_death.mp4) |
 
-Benchmark: 200 held-out mazes per difficulty (seeds 1,000,000+), sampled actions. Each cell is success / death /
-timeout in %, then mobs killed per level.
+### Results
 
-| difficulty | 1 | 2 | 3 | 4 | 5 | 6 |
-|---|---|---|---|---|---|---|
-| `cornichon_ppo_v4` | **91** / 8 / 0 · 0.8 | **82** / 17 / 0 · 1.1 | **71** / 26 / 4 · 1.1 | **42** / 51 / 7 · 1.7 | **40** / 51 / 10 · 1.7 | **16** / 76 / 8 · 1.7 |
-| `cornichon_fighter` | 90 / 8 / 2 · **3.7** | 70 / 12 / 18 · **5.2** | 59 / 18 / 23 · **5.5** | 41 / 22 / 38 · **7.6** | 28 / 31 / 41 · **7.7** | 14 / 49 / 36 · **9.1** |
-| random policy (100 mazes) | 0 / 80 / 20 · — | — | — | — | 0 / 85 / 15 · — | — |
+Benchmark: 200 unseen mazes per difficulty (seeds 1,000,000 and up; training uses seeds below 100,000), actions
+sampled from the policy. Each cell is **success** / death / timeout in %, then mobs killed per level.
 
-`ppo_v4` mostly runs past the mobs. The fighter kills 4–7× more mobs and dies far less, but it times out more
-often because it keeps fighting instead of finishing the level. Training that fixes this (a door bonus that grows
-with the share of mobs killed on the way) is in progress; see [EXPERIMENTS.md](EXPERIMENTS.md).
+| difficulty | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| **`cornichon_agent`** | **94** / 6 / 1 · **3.8** | **86** / 8 / 6 · **5.5** | **85** / 10 / 6 · **6.6** | **58** / 27 / 15 · **9.0** | **48** / 32 / 20 · **9.3** | **35** / 41 / 24 · **11.8** | **19** / 50 / 30 · **11.7** | **4** / 69 / 26 · **13.6** |
+| `cornichon_ppo_v4` (no arena) | 91 / 8 / 0 · 0.8 | 82 / 17 / 0 · 1.1 | 71 / 26 / 4 · 1.1 | 42 / 51 / 7 · 1.7 | 40 / 51 / 10 · 1.7 | 16 / 76 / 8 · 1.7 | 9 / 83 / 8 · 1.8 | 1 / 90 / 9 · 1.7 |
+| random policy (100 mazes) | 0 / 80 / 20 | | | | 0 / 85 / 15 | | | |
 
-### Run them
+How it got there: [EXPERIMENTS.md](EXPERIMENTS.md) logs every run and check.
 
-You need Java 17 and Python 3.10+. No GPU is needed: the policies run on CPU.
+- **Two-phase training is what worked.** First an *arena* (30M steps): the door is closed and a level ends only
+  when every mob is dead, so the agent has to learn the sphere. Then the normal game with the door reward on top
+  (50M steps, starting from those weights). Compared with the same game training from scratch (`cornichon_ppo_v4`), it
+  kills 5–8× more mobs, dies about half as often and wins more at every difficulty.
+- **Rewards that only paid for the door taught it to run past mobs.** Levels from difficulty 4 up are full of mobs,
+  so it died there.
+- **What did not help:** a compass pointing to the nearest mob, and a door bonus that grows with the share of mobs
+  killed. The compass barely moved the arena kill rate (55% of mobs vs 50% at the same point), and the game run
+  started from it did worse. The bonus made it hunt longer and time out more.
+- **Limits:** the game is 10 levels in a row, and the agent clears difficulty 6 a third of the time, so it does not
+  beat the whole game. From difficulty 5 up, most failures are deaths, not timeouts.
+
+`weights/cornichon_ppo_v4.pt` is the no-arena baseline. Both have a model card (`.json`) with the run, W&B id,
+commit and the benchmark numbers.
+
+### Run it
+
+You need Java 17 and Python 3.10+. No GPU is needed: the policy runs on CPU.
 
 ```bash
 git clone https://github.com/berkegokmen1/cornichon-rl.git && cd cornichon-rl
@@ -41,24 +59,24 @@ pip install -e .                                 # torch, gymnasium, numpy, pill
 # (Ubuntu without python3-venv: `sudo apt install python3-venv`, or `uv venv .venv && uv pip install -e .`)
 
 # win rate on 100 unseen mazes at difficulties 1-3
-python -m cornichon_rl.evaluate --checkpoint weights/cornichon_fighter.pt --difficulties 1 2 3 --episodes 100 --stochastic
-# GIF of it playing four unseen difficulty-2 mazes
-python -m cornichon_rl.render --checkpoint weights/cornichon_fighter.pt --difficulty 2 --stochastic --out fighter.gif
+python -m cornichon_rl.evaluate --checkpoint weights/cornichon_agent.pt --difficulties 1 2 3 --episodes 100 --stochastic
 # baseline
 python -m cornichon_rl.evaluate --policy random --difficulties 1 2 3
 ```
 
-Film it in the actual game (real sprites, camera and HUD, 60 fps mp4). This needs ffmpeg and a JDK with AWT
+Watch it in the actual game (real sprites, camera and HUD, 60 fps mp4). This needs ffmpeg and a JDK with AWT
 (`openjdk-17-jdk`, not `-headless`). On a desktop a game window opens and you can watch it play live; on a server
 with no display it starts its own Xvfb (`sudo apt install xvfb`):
 
 ```bash
 ./gradlew :recorder:installDist
-python -m cornichon_rl.record --checkpoint weights/cornichon_fighter.pt --difficulty 2 --seeds 1000000 1000001 --out-dir videos/
+python -m cornichon_rl.record --checkpoint weights/cornichon_agent.pt --difficulty 4 --seeds 1000003 --out-dir videos/
+scripts/make_media.sh videos/cornichon_agent_d4_seed1000003.mp4 clip   # clip.webp (2x speed) + smaller clip.mp4
 ```
 
-`--stochastic` (evaluate, render) samples actions the way the agent was trained and evaluated; `record` samples by default. The argmax policy (no flag) can get
-stuck in loops. To train your own, see [README_RL.md](README_RL.md).
+`--stochastic` (evaluate) samples actions the way the agent was trained and evaluated, and `record` does that by
+default. The argmax policy (no flag) can get stuck in loops. `python -m cornichon_rl.render` draws a top-down
+debug GIF of the whole maze instead. To train your own, see [README_RL.md](README_RL.md).
 
 ## **Cornichon**
 
