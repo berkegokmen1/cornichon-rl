@@ -19,7 +19,7 @@ import wandb
 from .config import load_config, to_dict
 from .curriculum import Curriculum, eval_seeds
 from .env import VecCornichon
-from .evaluate import evaluate, sweep
+from .evaluate import play_levels, summarize, sweep
 from .model import ActorCritic, to_tensors
 
 
@@ -108,7 +108,9 @@ def episode_metrics(episodes, prefix):
     if not episodes:
         return {}
     metrics = {f"{prefix}/episodes": len(episodes)}
-    for key in ("return", "length", "time_limit", "success", "death", "timeout", "progress", "mobs_killed", "damage_dealt", "damage", "collected", "score"):
+    keys = ("return", "length", "time_limit", "success", "death", "timeout", "progress", "mobs_killed", "kill_fraction",
+            "damage_dealt", "damage", "collected", "score", "arena")
+    for key in keys:
         metrics[f"{prefix}/{key}"] = float(np.mean([float(e[key]) for e in episodes]))
     for part in episodes[0]["parts"]:
         metrics[f"reward_parts/{part}"] = float(np.mean([e["parts"].get(part, 0.0) for e in episodes]))
@@ -170,6 +172,10 @@ def main():
         torch.set_rng_state(checkpoint["torch_rng"].cpu())  # map_location moved it to the GPU
         np.random.set_state(checkpoint["numpy_rng"])
         print(f"resumed {run_dir}/latest.pt at update {update}, {env_steps} env steps, difficulty {curriculum.difficulty}")
+    elif config.init_from:
+        # weights only (e.g. phase 2 starting from arena pretraining); the optimizer, curriculum and run start fresh
+        model.load_state_dict(torch.load(config.init_from, map_location=device, weights_only=False)["model"])
+        print(f"initialized weights from {config.init_from}")
     with open(run_dir / "config.json", "w") as f:
         json.dump(to_dict(config), f, indent=1)
 
@@ -239,7 +245,7 @@ def main():
                 for episode in info["episodes"]:
                     finished.append(episode)
                     recent.append(episode)
-                    if curriculum.record(episode["difficulty"], episode["success"], episode["monster_difficulty"]):
+                    if curriculum.record(episode):
                         print(f"update {update}: curriculum promoted to difficulty {curriculum.difficulty}", flush=True)
             rollout_seconds = time.time() - started
             env_steps += n * horizon
@@ -275,10 +281,9 @@ def main():
 
             if update % config.eval.every_updates == 0 or update == total_updates:
                 model.eval()
-                summary, _ = evaluate(
-                    model, curriculum.difficulty, eval_seeds(config.eval.episodes), env_cfg,
-                    config.reward_config(), device, greedy=config.eval.greedy,
-                )
+                levels = curriculum.levels(curriculum.difficulty, eval_seeds(config.eval.episodes))
+                episodes = play_levels(model, levels, env_cfg, config.reward_config(), device, greedy=config.eval.greedy)
+                summary = {"difficulty": curriculum.difficulty, **summarize(episodes)}
                 metrics.update({f"eval/{k}": v for k, v in summary.items()})
                 score = (summary["difficulty"], summary["success"])
                 if score > (best["difficulty"], best["success"]):
@@ -289,12 +294,13 @@ def main():
             if update % config.eval.sweep_every_updates == 0 or update == total_updates:
                 model.eval()
                 top = min(config.curriculum.end, curriculum.difficulty + 1)
+                seeds = eval_seeds(config.eval.sweep_episodes)
                 by_difficulty = sweep(
-                    model, range(config.curriculum.start, top + 1), eval_seeds(config.eval.sweep_episodes), env_cfg,
+                    model, {d: curriculum.levels(d, seeds) for d in range(config.curriculum.start, top + 1)}, env_cfg,
                     config.reward_config(), device, greedy=config.eval.greedy,
                 )
                 for d, summary in by_difficulty.items():
-                    for key in ("success", "death", "timeout", "progress", "length"):
+                    for key in ("success", "death", "timeout", "progress", "length", "kill_fraction"):
                         metrics[f"eval_sweep/d{d:02d}/{key}"] = summary[key]
                 print(f"update {update} sweep success: " + " ".join(f"d{d}={s['success']:.2f}" for d, s in by_difficulty.items()), flush=True)
 

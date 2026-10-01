@@ -17,6 +17,7 @@ class EnvConfig:
     max_steps: int = 1500
     time_base: int = 300
     time_per_tile: int = 6
+    arena_steps: int = 600  # time limit of an arena level (door closed, kill every mob)
     repeat: int = 4  # game frames per decision
     view_width: int = 31
     view_height: int = 21
@@ -64,6 +65,7 @@ class TrainConfig:
     wandb_project: str = "cornichon-rl"
     wandb_entity: str = "berkegokmen1"
     checkpoint_every: int = 10  # updates
+    init_from: str = ""  # start from these model weights (e.g. arena pretraining); optimizer and curriculum start fresh
     env: EnvConfig = field(default_factory=EnvConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     ppo: PPOConfig = field(default_factory=PPOConfig)

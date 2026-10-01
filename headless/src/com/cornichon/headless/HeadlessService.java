@@ -16,7 +16,8 @@ import java.nio.charset.StandardCharsets;
  *
  * <pre>
  * {"op":"reset","ids":[0,3],"seeds":[17,42],"difficulties":[1,1]}  -> {"envs":[...]} for those ids
- *   optional "monster_difficulties":[4,1] (mob density); start with --grid-bytes=2 for sphere/fireball channels
+ *   optional "monster_difficulties":[4,1] (mob density) and "door_closed":[true,false] (combat practice);
+ *   start with --grid-bytes=2 for sphere/fireball channels
  * {"op":"step","actions":[[m,j,s,sx,sy], ...one per env],"repeat":4} -> {"envs":[...]} for all envs
  * {"op":"snapshot","id":0}                                           -> whole-level grid for env 0
  * {"op":"close"}                                                     -> {"ok":true}, then exit
@@ -43,7 +44,7 @@ public final class HeadlessService {
     Simulation[] sims = new Simulation[envs];
     for (int i = 0; i < envs; i++) {
       sims[i] = new Simulation(viewWidth, viewHeight, gridBytes);
-      sims[i].reset(i, 1, 1);
+      sims[i].reset(i, 1, 1, false);
     }
     protocol.println(String.format(
       "{\"ready\":true,\"envs\":%d,\"view_width\":%d,\"view_height\":%d,\"state_size\":%d}",
@@ -66,7 +67,10 @@ public final class HeadlessService {
           int[] difficulties = request.get("difficulties").asIntArray();
           // optional: denser mobs than the maze size implies (training only); defaults to the game's density
           int[] monsters = request.has("monster_difficulties") ? request.get("monster_difficulties").asIntArray() : difficulties;
-          for (int i = 0; i < ids.length; i++) sims[ids[i]].reset(seeds[i], difficulties[i], monsters[i]);
+          // optional: the door does nothing (combat practice; the level ends when every mob is dead)
+          boolean[] closed = new boolean[ids.length];
+          if (request.has("door_closed")) closed = request.get("door_closed").asBooleanArray();
+          for (int i = 0; i < ids.length; i++) sims[ids[i]].reset(seeds[i], difficulties[i], monsters[i], closed[i]);
           response = envsJson(sims, ids);
         } else if (op.equals("step")) {
           JsonValue actions = request.get("actions");

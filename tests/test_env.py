@@ -53,3 +53,22 @@ def test_episodes_end_at_their_own_time_limit():
     env.close()
     for e in episodes:
         assert e["timeout"] and e["length"] == e["time_limit"] and e["time_limit"] in expected
+
+
+def test_arena_levels_end_only_when_cleared_dead_or_timed_out():
+    from cornichon_rl.curriculum import LevelSpec
+
+    seeds = iter(range(1000))
+    env = VecCornichon(4, lambda _i: LevelSpec(1, next(seeds), 4, arena=True), envs_per_service=4, arena_steps=40)
+    rng = np.random.default_rng(1)
+    env.reset()
+    assert all(row["door_closed"] and row["mobs_total"] > 0 for row in env.rows)
+    episodes = []
+    while len(episodes) < 8:
+        actions = np.stack([rng.integers(n, size=4) for n in (3, 2, 2, 3, 3)], 1)
+        episodes += env.step(actions)[4]["episodes"]
+    env.close()
+    for e in episodes:
+        assert e["arena"] and e["mobs_total"] > 0
+        assert e["success"] == (e["mobs_killed"] == e["mobs_total"])
+        assert e["timeout"] == (e["length"] == 40 and not e["success"] and not e["death"])

@@ -52,6 +52,8 @@ public class Level {
 
   // Reached the door. Set before the screen switch so the headless simulator (game == null) can read it.
   private boolean completed;
+  // RL combat practice: the door does nothing, so the only way to finish is to clear the level.
+  private boolean doorClosed;
   private int fireTrigger;
   private int buffTimer;
 
@@ -430,7 +432,14 @@ public class Level {
     }
   }
 
+  public void setDoorClosed(boolean doorClosed) {
+    this.doorClosed = doorClosed;
+  }
+
   public void nextLevel() {
+    if (doorClosed) {
+      return;
+    }
     completed = true;
     if (game == null) {
       return;

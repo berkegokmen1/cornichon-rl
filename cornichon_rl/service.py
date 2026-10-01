@@ -63,8 +63,9 @@ class SimService:
         self._send(request)
         return self._read()
 
-    def reset(self, ids, seeds, difficulties, monster_difficulties=None):
-        """monster_difficulties: mob/potion density per level (training only); defaults to each level's difficulty."""
+    def reset(self, ids, seeds, difficulties, monster_difficulties=None, door_closed=None):
+        """monster_difficulties: mob/potion density per level (training only); defaults to each level's difficulty.
+        door_closed: per level, the door does nothing (arena: the level ends when every mob is dead)."""
         request = {
             "op": "reset",
             "ids": [int(i) for i in ids],
@@ -73,6 +74,8 @@ class SimService:
         }
         if monster_difficulties is not None:
             request["monster_difficulties"] = [int(m) for m in monster_difficulties]
+        if door_closed is not None:
+            request["door_closed"] = [bool(c) for c in door_closed]
         return self.call(request)["envs"]
 
     # step is split in two so several services can simulate at the same time (see VecCornichon.step).

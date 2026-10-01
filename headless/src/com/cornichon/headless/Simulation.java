@@ -52,6 +52,7 @@ final class Simulation {
   private long seed;
   private int difficulty;
   private int monsterDifficulty;
+  private boolean doorClosed;
   private int frames;
   private int mobsAtStart;
   private final List<Mob> mobs = new ArrayList<Mob>(); // every mob of the level, dead ones included
@@ -64,7 +65,7 @@ final class Simulation {
     this.gridBytes = gridBytes;
   }
 
-  void reset(long seed, int difficulty, int monsterDifficulty) {
+  void reset(long seed, int difficulty, int monsterDifficulty, boolean doorClosed) {
     if (level != null) {
       level.dispose();
     }
@@ -72,6 +73,8 @@ final class Simulation {
     this.difficulty = difficulty;
     this.monsterDifficulty = monsterDifficulty;
     level = new Level(difficulty, monsterDifficulty, Constants.PLAYER_HEALTH, seed);
+    level.setDoorClosed(doorClosed);
+    this.doorClosed = doorClosed;
     controller = new PlayerController(level);
     map = level.getMap().getMapIntArr();
     doorDistance = distancesToDoor();
@@ -138,7 +141,8 @@ final class Simulation {
     json.append(String.format(
       Locale.US,
       "],\"completed\":%b,\"dead\":%b,\"frames\":%d,\"mobs_killed\":%d,\"collected\":%d,\"damage\":%.1f," +
-      "\"damage_dealt\":%d,\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d,\"monster_difficulty\":%d}",
+      "\"damage_dealt\":%d,\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d,\"monster_difficulty\":%d," +
+      "\"mobs_total\":%d,\"mobs_left\":%d,\"door_closed\":%b}",
       level.isCompleted(),
       player.isDead(),
       frames,
@@ -153,7 +157,10 @@ final class Simulation {
       player.getBody().getPosition().y,
       seed,
       difficulty,
-      monsterDifficulty
+      monsterDifficulty,
+      mobsAtStart,
+      countMobs(),
+      doorClosed
     ));
     return json.toString();
   }

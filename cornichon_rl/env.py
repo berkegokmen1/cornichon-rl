@@ -15,6 +15,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
+from .curriculum import LevelSpec
 from .reward import UNREACHABLE, RewardConfig, step_reward
 from .service import ACTION_NVEC, GRID_CHANNELS, SimService, decode_grid
 
@@ -42,14 +43,23 @@ def observe(row, steps, limit, height, width):
     return {"grid": decode_grid(row, height, width), "state": state}
 
 
+def is_cleared(row):
+    """Arena levels (door closed) end when every mob is dead."""
+    return bool(row["door_closed"] and row["mobs_left"] == 0)
+
+
 def episode_summary(row, steps, limit, episode_return, parts, start_distance):
+    success = bool(row["completed"]) or is_cleared(row)
     return {
         "return": episode_return,
         "length": steps,
         "time_limit": limit,
-        "success": bool(row["completed"]),
+        "success": success,  # reached the door, or cleared the arena
         "death": bool(row["dead"]),
-        "timeout": not (row["completed"] or row["dead"]),
+        "timeout": not (success or row["dead"]),
+        "arena": bool(row["door_closed"]),
+        "mobs_total": row["mobs_total"],
+        "kill_fraction": row["mobs_killed"] / row["mobs_total"] if row["mobs_total"] else 0.0,
         "difficulty": row["difficulty"],
         "monster_difficulty": row["monster_difficulty"],
         "seed": row["seed"],
@@ -79,6 +89,7 @@ class VecCornichon:
         max_steps=1500,
         time_base=300,
         time_per_tile=6,
+        arena_steps=600,
         repeat=4,
         reward=RewardConfig(),
         view_width=31,
@@ -89,6 +100,7 @@ class VecCornichon:
         self.max_steps = max_steps
         self.time_base = time_base
         self.time_per_tile = time_per_tile
+        self.arena_steps = arena_steps
         self.repeat = repeat
         self.reward = reward
         self.height, self.width = view_height, view_width
@@ -106,6 +118,7 @@ class VecCornichon:
         self.parts = [{} for _ in range(num_envs)]
         self.start_distance = [0] * num_envs
         self.limits = np.full(num_envs, max_steps)
+        self.specs = [None] * num_envs  # the LevelSpec each env was asked to play (before any arena re-seeding)
 
     @classmethod
     def from_config(cls, num_envs, next_level, env_config, reward=RewardConfig()):
@@ -116,6 +129,7 @@ class VecCornichon:
             max_steps=env_config.max_steps,
             time_base=env_config.time_base,
             time_per_tile=env_config.time_per_tile,
+            arena_steps=env_config.arena_steps,
             repeat=env_config.repeat,
             reward=reward,
             view_width=env_config.view_width,
@@ -132,18 +146,31 @@ class VecCornichon:
         by_service = {}
         for env in envs:
             service, local = self._locate(env)
-            difficulty, seed, *monsters = self.next_level(env)
-            monster_difficulty = monsters[0] if monsters else difficulty
-            by_service.setdefault(id(service), (service, []))[1].append((env, local, difficulty, seed, monster_difficulty))
+            by_service.setdefault(id(service), (service, []))[1].append((env, local, LevelSpec.of(self.next_level(env))))
         for service, items in by_service.values():
-            rows = service.reset([i[1] for i in items], [i[3] for i in items], [i[2] for i in items], [i[4] for i in items])
-            for (env, *_), row in zip(items, rows):
+            rows = service.reset(
+                [local for _, local, _ in items],
+                [spec.seed for *_, spec in items],
+                [spec.difficulty for *_, spec in items],
+                [spec.monsters for *_, spec in items],
+                [spec.arena for *_, spec in items],
+            )
+            for (env, local, spec), row in zip(items, rows):
+                self.specs[env] = spec
+                # an arena without mobs would be cleared before it starts: take the next seed instead
+                tries = 0
+                while spec.arena and row["mobs_total"] == 0 and tries < 50:
+                    spec, tries = spec._replace(seed=spec.seed + 1), tries + 1
+                    row = service.reset([local], [spec.seed], [spec.difficulty], [spec.monsters], [True])[0]
                 self.rows[env] = row
                 self.steps[env] = 0
                 self.returns[env] = 0.0
                 self.parts[env] = {}
                 self.start_distance[env] = row["door_distance"]
-                self.limits[env] = time_limit(row["door_distance"], self.max_steps, self.time_base, self.time_per_tile)
+                if spec.arena:
+                    self.limits[env] = self.arena_steps
+                else:
+                    self.limits[env] = time_limit(row["door_distance"], self.max_steps, self.time_base, self.time_per_tile)
 
     def reset(self):
         self._reset_envs(range(self.num_envs))
@@ -181,12 +208,14 @@ class VecCornichon:
             for key, value in parts.items():
                 self.parts[env][key] = self.parts[env].get(key, 0.0) + value
             rewards[env] = reward
-            terminated[env] = row["completed"] or row["dead"]
+            terminated[env] = row["completed"] or row["dead"] or is_cleared(row)
             truncated[env] = not terminated[env] and self.steps[env] >= self.limits[env]
             if terminated[env] or truncated[env]:
-                episodes.append(episode_summary(
+                summary = episode_summary(
                     row, int(self.steps[env]), int(self.limits[env]), float(self.returns[env]), self.parts[env], self.start_distance[env]
-                ))
+                )
+                summary["level"] = self.specs[env]
+                episodes.append(summary)
                 if truncated[env]:
                     final_obs[env] = self._obs(env)
                 finished.append(env)

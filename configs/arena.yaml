@@ -1,0 +1,39 @@
+# Phase 1, combat pretraining: small mazes (difficulty-1 size) with the door closed. A level ends when every mob is
+# dead (success), on death, or after 600 decisions. The curriculum raises mob density from difficulty 2 to 10.
+# Phase 2 starts the normal game from these weights: configs/default.yaml with init_from=RUN_DIR/best.pt
+name: arena
+device: cuda
+wandb_mode: online
+
+env:
+  num_envs: 128
+  envs_per_service: 16
+  arena_steps: 600
+
+model:
+  recurrent: true
+  hidden: 256
+
+ppo:
+  total_steps: 30_000_000
+  horizon: 128
+  gamma: 0.995
+
+curriculum:
+  arena: true
+  arena_maze: 1
+  start: 2
+  end: 10
+  promote_at: 0.7
+  window: 200
+  replay: 0.2
+
+eval:
+  every_updates: 50
+  episodes: 100
+  sweep_every_updates: 200
+  sweep_episodes: 20
+  greedy: false
+
+reward:
+  path_progress: 0.0   # no door to walk to

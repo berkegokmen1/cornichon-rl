@@ -11,23 +11,24 @@ import numpy as np
 import torch
 
 from .config import EnvConfig
-from .curriculum import EVAL_SEED_START, eval_seeds
+from .curriculum import EVAL_SEED_START, LevelSpec, eval_seeds
 from .env import VecCornichon
 from .model import ActorCritic, to_tensors
 from .reward import RewardConfig
 from .service import ACTION_NVEC
 
-FILLER_SEED = EVAL_SEED_START - 1  # keeps idle envs busy once every evaluation level has been handed out
+FILLER = LevelSpec(1, EVAL_SEED_START - 1)  # keeps idle envs busy once every evaluation level has been handed out
 
 
 def play_levels(policy, levels, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=32):
-    """Plays each (difficulty, seed) once, in parallel. policy is an ActorCritic or "random". Returns the episode
-    summaries in the order of `levels`."""
+    """Plays each level once, in parallel. levels: LevelSpecs or (difficulty, seed) pairs. policy is an ActorCritic or
+    "random". Returns the episode summaries in the order of `levels`."""
+    levels = [LevelSpec.of(level) for level in levels]
     queue = list(levels)
     wanted = set(levels)
 
     def next_level(_env):
-        return queue.pop(0) if queue else (1, FILLER_SEED)
+        return queue.pop(0) if queue else FILLER
 
     env = VecCornichon.from_config(min(max_envs, len(levels)), next_level, env_config, reward)
     rng = np.random.default_rng(0)
@@ -45,9 +46,8 @@ def play_levels(policy, levels, env_config, reward=RewardConfig(), device="cpu",
             obs, _, terminated, truncated, info = env.step(actions)
             starts = torch.as_tensor(terminated | truncated, device=device, dtype=torch.float32)
             for episode in info["episodes"]:
-                level = (episode["difficulty"], episode["seed"])
-                if level in wanted:
-                    episodes.setdefault(level, episode)
+                if episode["level"] in wanted:
+                    episodes.setdefault(episode["level"], episode)
     finally:
         env.close()
     return [episodes[level] for level in levels]
@@ -55,22 +55,26 @@ def play_levels(policy, levels, env_config, reward=RewardConfig(), device="cpu",
 
 def summarize(episodes):
     summary = {"episodes": len(episodes)}
-    for key in ("success", "death", "timeout", "return", "length", "time_limit", "progress", "mobs_killed", "damage_dealt", "score"):
+    keys = ("success", "death", "timeout", "return", "length", "time_limit", "progress", "mobs_killed", "kill_fraction",
+            "damage_dealt", "damage", "score")
+    for key in keys:
         summary[key] = float(np.mean([float(e[key]) for e in episodes]))
     return summary
 
 
 def evaluate(policy, difficulty, seeds, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=32):
-    """Plays each seed once at `difficulty`. Returns (summary, episodes)."""
+    """Plays each seed once on the real game level at `difficulty`. Returns (summary, episodes)."""
     episodes = play_levels(policy, [(difficulty, s) for s in seeds], env_config, reward, device, greedy, max_envs)
     return {"difficulty": difficulty, **summarize(episodes)}, episodes
 
 
-def sweep(policy, difficulties, seeds, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=64):
-    """evaluate() at several difficulties in one parallel batch. Returns {difficulty: summary}."""
-    levels = [(d, s) for d in difficulties for s in seeds]
-    episodes = play_levels(policy, levels, env_config, reward, device, greedy, max_envs)
-    return {d: summarize([e for e in episodes if e["difficulty"] == d]) for d in difficulties}
+def sweep(policy, levels_by_difficulty, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=64):
+    """{difficulty: [levels]} played in one parallel batch -> {difficulty: summary}."""
+    flat = [LevelSpec.of(level) for levels in levels_by_difficulty.values() for level in levels]
+    episodes = dict(zip(flat, play_levels(policy, flat, env_config, reward, device, greedy, max_envs)))
+    return {
+        d: summarize([episodes[LevelSpec.of(level)] for level in levels]) for d, levels in levels_by_difficulty.items()
+    }
 
 
 def load_policy(path, device):

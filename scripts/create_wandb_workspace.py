@@ -24,6 +24,8 @@ The reward the policy maximises is the sum of the `reward_parts/*` terms.
 - `eval_sweep/dNN/*`: every 200 updates, 20 held-out mazes at **every** difficulty up to current + 1: shows
   forgetting of easier levels and readiness for the next one. Difficulty = bigger maze, longer route, more enemies
   (d1: 29x17, 6 mobs; d10: 65x45, 131 mobs and no potions, the original game's formula).
+- **Arena runs** (`arena_*`, phase 1): door closed, success = every mob killed, and "difficulty" is the mob density
+  (2 to 10) on small mazes. Phase-2 runs start from arena weights. Experiment log: `EXPERIMENTS.md` in the repo.
 - `ppo/*`: optimizer health. approx KL ≲ 0.02 and clip fraction ≲ 0.2 are normal; explained variance → 1 means the critic tracks returns.
 - `system/*`: throughput. The x axis everywhere is environment steps (agent decisions).
 """
@@ -99,6 +101,8 @@ workspace = ws.Workspace(
                 ),
                 line("path progress shaping", "reward_parts/path_progress"),
                 line("combat: kills per episode", "rollout/mobs_killed", "eval/mobs_killed"),
+                line("combat: fraction of the level's mobs killed", "rollout/kill_fraction", "eval/kill_fraction"),
+                line("arena share of training episodes (phase 1 = 1)", "rollout/arena"),
                 line("combat: sphere damage dealt vs damage taken", "rollout/damage_dealt", "rollout/damage"),
                 line("potions collected", "rollout/collected"),
                 line("game score (not trained on)", "rollout/score"),
@@ -122,6 +126,7 @@ workspace = ws.Workspace(
                 line("held-out progress per difficulty", *[f"eval_sweep/d{d:02d}/progress" for d in range(1, 11)]),
                 line("held-out deaths per difficulty", *[f"eval_sweep/d{d:02d}/death" for d in range(1, 11)]),
                 line("held-out timeouts per difficulty", *[f"eval_sweep/d{d:02d}/timeout" for d in range(1, 11)]),
+                line("held-out kill fraction per difficulty", *[f"eval_sweep/d{d:02d}/kill_fraction" for d in range(1, 11)]),
             ],
         ),
         section(

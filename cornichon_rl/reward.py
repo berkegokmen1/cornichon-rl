@@ -23,6 +23,10 @@ class RewardConfig:
     # Progress shaping: + per tile the shortest path to the door gets shorter, - per tile it gets longer. It
     # telescopes over an episode to path_progress * (start distance - end distance), so it cannot be farmed.
     path_progress: float = 0.2
+    # Arena only (door closed): bonus for killing the last mob, and a cost per step while mobs are alive so that
+    # hiding is not a safe way to avoid damage.
+    cleared: float = 5.0
+    mobs_alive_step: float = -0.003
 
     @classmethod
     def from_dict(cls, values):
@@ -39,12 +43,17 @@ def step_reward(previous, current, config):
         "level_complete": config.level_complete * float(current["completed"]),
         "death": config.death * float(current["dead"]),
         "mob_killed": config.mob_killed * (current["mobs_killed"] - previous["mobs_killed"]),
-        "damage_dealt": config.damage_dealt_per_hp * (current["damage_dealt"] - previous["damage_dealt"]),
+        "damage_dealt": config.damage_dealt_per_hp * (current.get("damage_dealt", 0) - previous.get("damage_dealt", 0)),
         "damage": config.damage_per_hp * (current["damage"] - previous["damage"]),
         "collected": config.collected * (current["collected"] - previous["collected"]),
         "step": config.step,
         "path_progress": 0.0,
+        "cleared": 0.0,
+        "mobs_alive": 0.0,
     }
+    if current.get("door_closed"):
+        parts["cleared"] = config.cleared * float(previous["mobs_left"] > 0 and current["mobs_left"] == 0)
+        parts["mobs_alive"] = config.mobs_alive_step * float(current["mobs_left"] > 0)
     before, after = previous["door_distance"], current["door_distance"]
     if before != UNREACHABLE and after != UNREACHABLE:
         parts["path_progress"] = config.path_progress * (before - after)

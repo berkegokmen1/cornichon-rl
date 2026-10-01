@@ -7,11 +7,24 @@ enough; a fraction of episodes replays easier difficulties so earlier levels are
 
 from collections import deque
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 
 # Evaluation seeds start here; training seeds are drawn from [0, train_seed_count), which must stay below it.
 EVAL_SEED_START = 1_000_000
+
+
+class LevelSpec(NamedTuple):
+    difficulty: int  # maze size (the game's level number)
+    seed: int
+    monsters: int | None = None  # mob/potion density; None = the game's (= difficulty)
+    arena: bool = False  # door closed: the level ends when every mob is dead (combat practice)
+
+    @classmethod
+    def of(cls, level):
+        spec = level if isinstance(level, LevelSpec) else cls(*level)
+        return spec if spec.monsters is not None else spec._replace(monsters=spec.difficulty)
 
 
 @dataclass
@@ -26,6 +39,10 @@ class CurriculumConfig:
     # difficulties higher, so fighting is needed long before the large levels. Promotion counts only real game levels.
     monster_practice: float = 0.0
     monster_boost: int = 3
+    # Arena mode (combat pretraining): every level is a small maze (arena_maze) with the door closed; the curriculum
+    # difficulty is the mob density, and success means killing every mob.
+    arena: bool = False
+    arena_maze: int = 1
 
 
 class Curriculum:
@@ -38,22 +55,37 @@ class Curriculum:
         self.recent = deque(maxlen=config.window)
 
     def sample(self):
-        """(difficulty, seed, monster_difficulty) for a new training episode."""
+        """LevelSpec for a new training episode."""
         difficulty = self.difficulty
         if difficulty > self.config.start and self.rng.random() < self.config.replay:
             difficulty = int(self.rng.integers(self.config.start, self.difficulty))
         seed = int(self.rng.integers(self.config.train_seed_count))
+        if self.config.arena:
+            return LevelSpec(self.config.arena_maze, seed, difficulty, arena=True)
         monsters = difficulty
         if self.rng.random() < self.config.monster_practice:
             monsters = min(10, difficulty + int(self.rng.integers(1, self.config.monster_boost + 1)))
-        return difficulty, seed, monsters
+        return LevelSpec(difficulty, seed, monsters)
 
-    def record(self, difficulty, success, monster_difficulty=None):
-        """Count a finished episode; returns True when this promoted the curriculum. Practice levels (denser mobs
-        than the game) do not count."""
-        if difficulty != self.difficulty or (monster_difficulty is not None and monster_difficulty != difficulty):
+    def level_difficulty(self, episode):
+        """Which curriculum difficulty an episode belongs to, or None if it does not count (practice levels)."""
+        if self.config.arena:
+            return episode["monster_difficulty"] if episode["arena"] else None
+        if episode["arena"] or episode["monster_difficulty"] != episode["difficulty"]:
+            return None
+        return episode["difficulty"]
+
+    def levels(self, difficulty, seeds):
+        """Evaluation levels at a curriculum difficulty: real game levels, or arenas in arena mode."""
+        if self.config.arena:
+            return [LevelSpec(self.config.arena_maze, s, difficulty, arena=True) for s in seeds]
+        return [LevelSpec(difficulty, s, difficulty) for s in seeds]
+
+    def record(self, episode):
+        """Count a finished episode; returns True when this promoted the curriculum."""
+        if self.level_difficulty(episode) != self.difficulty:
             return False
-        self.recent.append(bool(success))
+        self.recent.append(bool(episode["success"]))
         if (
             self.difficulty < self.config.end
             and len(self.recent) == self.recent.maxlen
