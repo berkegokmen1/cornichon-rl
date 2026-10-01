@@ -1,0 +1,7 @@
+.gradle/
+**/build/
+.venv/
+__pycache__/
+*.pyc
+wandb/
+checkpoints/

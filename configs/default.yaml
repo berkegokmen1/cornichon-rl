@@ -1,0 +1,34 @@
+# Full curriculum: difficulty 1 -> 10 (the game's ten levels), PPO on the real headless game.
+# Every key is documented in cornichon_rl/config.py; override any of them on the command line (ppo.lr=1e-4).
+name: ppo_curriculum
+device: cuda
+wandb_mode: online
+
+env:
+  num_envs: 128
+  envs_per_service: 16   # 8 Java processes; ~8k env steps/s on d5
+  max_steps: 1500        # decisions per level = 100 s of game time
+  repeat: 4              # 15 decisions per second
+
+ppo:
+  total_steps: 50_000_000
+  horizon: 128
+  epochs: 4
+  minibatches: 8
+  lr: 2.5e-4
+  gamma: 0.995
+  gae_lambda: 0.95
+  entropy_coef: 0.01
+
+curriculum:
+  start: 1
+  end: 10
+  promote_at: 0.8
+  window: 200
+  replay: 0.2
+
+eval:
+  every_updates: 50
+  episodes: 100
+
+reward: {}   # RewardConfig defaults (cornichon_rl/reward.py)

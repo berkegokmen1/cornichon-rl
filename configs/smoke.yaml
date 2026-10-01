@@ -1,0 +1,22 @@
+# Seconds-long CPU run for tests and plumbing checks.
+name: smoke
+device: cpu
+torch_threads: 1
+wandb_mode: disabled
+out_dir: /tmp/cornichon-rl-smoke
+checkpoint_every: 1
+
+env:
+  num_envs: 4
+  envs_per_service: 2
+  max_steps: 40
+
+ppo:
+  total_steps: 1024
+  horizon: 64
+  minibatches: 2
+  epochs: 1
+
+eval:
+  every_updates: 2
+  episodes: 4
