@@ -1,9 +1,10 @@
 # cornichon-rl
 
-Reinforcement learning on **Cornichon**, a 2D roguelike platformer we built as a Bilkent CS102 project. A PPO agent
-plays the real game (the same Java/libGDX/Box2D code as the desktop build) through a headless simulator, on
-procedurally generated mazes it has never seen. See **[README_RL.md](README_RL.md)** for how it works and how to
-train; the original game README follows.
+A reinforcement-learning agent for **[Cornichon](https://github.com/Muria1/Cornichon)**, the 2D roguelike platformer
+we built as a Bilkent CS102 group project. This repo is that game plus an RL agent that learns to play it: PPO
+trained on the real game code (the same Java/libGDX/Box2D code as the desktop build) through a headless simulator,
+on procedurally generated mazes it has never seen. See **[README_RL.md](README_RL.md)** for how it works and how to
+train. The original game's README follows.
 
 ## **Cornichon**
 
