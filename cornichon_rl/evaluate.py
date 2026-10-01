@@ -17,27 +17,19 @@ from .model import ActorCritic, to_tensors
 from .reward import RewardConfig
 from .service import ACTION_NVEC
 
-FILLER_SEED = EVAL_SEED_START - 1  # keeps idle envs busy once every evaluation seed has been handed out
+FILLER_SEED = EVAL_SEED_START - 1  # keeps idle envs busy once every evaluation level has been handed out
 
 
-def evaluate(policy, difficulty, seeds, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=32):
-    """Plays each seed once at `difficulty`. policy is an ActorCritic or "random". Returns (summary, episodes)."""
-    queue = list(seeds)
-    wanted = set(seeds)
+def play_levels(policy, levels, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=32):
+    """Plays each (difficulty, seed) once, in parallel. policy is an ActorCritic or "random". Returns the episode
+    summaries in the order of `levels`."""
+    queue = list(levels)
+    wanted = set(levels)
 
     def next_level(_env):
-        return difficulty, (queue.pop(0) if queue else FILLER_SEED)
+        return queue.pop(0) if queue else (1, FILLER_SEED)
 
-    env = VecCornichon(
-        min(max_envs, len(seeds)),
-        next_level,
-        envs_per_service=env_config.envs_per_service,
-        max_steps=env_config.max_steps,
-        repeat=env_config.repeat,
-        reward=reward,
-        view_width=env_config.view_width,
-        view_height=env_config.view_height,
-    )
+    env = VecCornichon.from_config(min(max_envs, len(levels)), next_level, env_config, reward)
     rng = np.random.default_rng(0)
     episodes = {}
     try:
@@ -49,24 +41,32 @@ def evaluate(policy, difficulty, seeds, env_config, reward=RewardConfig(), devic
                 actions = policy.act(to_tensors(obs, device), greedy=greedy)[0].cpu().numpy()
             obs, _, _, _, info = env.step(actions)
             for episode in info["episodes"]:
-                if episode["seed"] in wanted:
-                    episodes.setdefault(episode["seed"], episode)
+                level = (episode["difficulty"], episode["seed"])
+                if level in wanted:
+                    episodes.setdefault(level, episode)
     finally:
         env.close()
-    episodes = [episodes[s] for s in seeds]
-    summary = {
-        "difficulty": difficulty,
-        "episodes": len(episodes),
-        "success": float(np.mean([e["success"] for e in episodes])),
-        "death": float(np.mean([e["death"] for e in episodes])),
-        "timeout": float(np.mean([e["timeout"] for e in episodes])),
-        "return": float(np.mean([e["return"] for e in episodes])),
-        "length": float(np.mean([e["length"] for e in episodes])),
-        "progress": float(np.mean([e["progress"] for e in episodes])),
-        "mobs_killed": float(np.mean([e["mobs_killed"] for e in episodes])),
-        "score": float(np.mean([e["score"] for e in episodes])),
-    }
-    return summary, episodes
+    return [episodes[level] for level in levels]
+
+
+def summarize(episodes):
+    summary = {"episodes": len(episodes)}
+    for key in ("success", "death", "timeout", "return", "length", "time_limit", "progress", "mobs_killed", "score"):
+        summary[key] = float(np.mean([float(e[key]) for e in episodes]))
+    return summary
+
+
+def evaluate(policy, difficulty, seeds, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=32):
+    """Plays each seed once at `difficulty`. Returns (summary, episodes)."""
+    episodes = play_levels(policy, [(difficulty, s) for s in seeds], env_config, reward, device, greedy, max_envs)
+    return {"difficulty": difficulty, **summarize(episodes)}, episodes
+
+
+def sweep(policy, difficulties, seeds, env_config, reward=RewardConfig(), device="cpu", greedy=True, max_envs=64):
+    """evaluate() at several difficulties in one parallel batch. Returns {difficulty: summary}."""
+    levels = [(d, s) for d in difficulties for s in seeds]
+    episodes = play_levels(policy, levels, env_config, reward, device, greedy, max_envs)
+    return {d: summarize([e for e in episodes if e["difficulty"] == d]) for d in difficulties}
 
 
 def load_policy(path, device):

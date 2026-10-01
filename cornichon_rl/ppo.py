@@ -19,7 +19,7 @@ import wandb
 from .config import load_config, to_dict
 from .curriculum import Curriculum, eval_seeds
 from .env import VecCornichon
-from .evaluate import evaluate
+from .evaluate import evaluate, sweep
 from .model import ActorCritic, to_tensors
 
 
@@ -87,7 +87,7 @@ def episode_metrics(episodes, prefix):
     if not episodes:
         return {}
     metrics = {f"{prefix}/episodes": len(episodes)}
-    for key in ("return", "length", "success", "death", "timeout", "progress", "mobs_killed", "damage", "collected", "score"):
+    for key in ("return", "length", "time_limit", "success", "death", "timeout", "progress", "mobs_killed", "damage", "collected", "score"):
         metrics[f"{prefix}/{key}"] = float(np.mean([float(e[key]) for e in episodes]))
     for part in episodes[0]["parts"]:
         metrics[f"reward_parts/{part}"] = float(np.mean([e["parts"].get(part, 0.0) for e in episodes]))
@@ -165,16 +165,7 @@ def main():
     ppo, env_cfg = config.ppo, config.env
     n, horizon = env_cfg.num_envs, ppo.horizon
     total_updates = ppo.total_steps // (n * horizon)
-    env = VecCornichon(
-        n,
-        lambda _env: curriculum.sample(),
-        envs_per_service=env_cfg.envs_per_service,
-        max_steps=env_cfg.max_steps,
-        repeat=env_cfg.repeat,
-        reward=config.reward_config(),
-        view_width=env_cfg.view_width,
-        view_height=env_cfg.view_height,
-    )
+    env = VecCornichon.from_config(n, lambda _env: curriculum.sample(), env_cfg, config.reward_config())
     grid_shape = env.observation_space["grid"].shape
     state_shape = env.observation_space["state"].shape
     buffers = {
@@ -268,6 +259,18 @@ def main():
                     best = {"difficulty": summary["difficulty"], "success": summary["success"], "update": update}
                     save_checkpoint(run_dir / "best.pt", model, optimizer, update, env_steps, curriculum, config, wandb_id, best)
                 print(f"update {update} eval: {json.dumps(summary)}", flush=True)
+
+            if update % config.eval.sweep_every_updates == 0 or update == total_updates:
+                model.eval()
+                top = min(config.curriculum.end, curriculum.difficulty + 1)
+                by_difficulty = sweep(
+                    model, range(config.curriculum.start, top + 1), eval_seeds(config.eval.sweep_episodes), env_cfg,
+                    config.reward_config(), device, greedy=config.eval.greedy,
+                )
+                for d, summary in by_difficulty.items():
+                    for key in ("success", "death", "timeout", "progress", "length"):
+                        metrics[f"eval_sweep/d{d:02d}/{key}"] = summary[key]
+                print(f"update {update} sweep success: " + " ".join(f"d{d}={s['success']:.2f}" for d, s in by_difficulty.items()), flush=True)
 
             wandb.log(metrics, step=env_steps)
             print(

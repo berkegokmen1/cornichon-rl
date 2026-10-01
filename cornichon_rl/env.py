@@ -5,7 +5,9 @@ Observation (dict):
   state (17,)     Simulation.state() (velocities, health, mana, grounded, sphere offset/velocity, buff, door offset,
                   path distance, difficulty, sub-cell position) + fraction of the time limit used.
 Action: MultiDiscrete(ACTION_NVEC), each decision held for `repeat` game frames (60 fps; repeat 4 -> 15 Hz).
-Episode: one level. Ends on reaching the door (success), death, or after max_steps decisions (truncation).
+Episode: one level. Ends on reaching the door (success), death, or at the time limit (truncation): time_base +
+time_per_tile decisions per tile of shortest path from the start to the door, capped at max_steps, so bigger
+mazes (higher difficulty) get proportionally more time.
 """
 
 import gymnasium as gym
@@ -25,17 +27,25 @@ def observation_space(view_height, view_width):
     })
 
 
-def observe(row, steps, max_steps, height, width):
+def time_limit(start_distance, max_steps, time_base, time_per_tile):
+    """Decisions allowed for one level. time_per_tile 0 gives every level max_steps."""
+    if time_per_tile <= 0 or start_distance >= UNREACHABLE:
+        return max_steps
+    return int(min(max_steps, time_base + time_per_tile * start_distance))
+
+
+def observe(row, steps, limit, height, width):
     state = np.empty(STATE_SIZE, np.float32)
     state[:-1] = np.clip(row["state"], -10.0, 10.0)
-    state[-1] = steps / max_steps
+    state[-1] = steps / limit
     return {"grid": decode_grid(row, height, width), "state": state}
 
 
-def episode_summary(row, steps, episode_return, parts, start_distance):
+def episode_summary(row, steps, limit, episode_return, parts, start_distance):
     return {
         "return": episode_return,
         "length": steps,
+        "time_limit": limit,
         "success": bool(row["completed"]),
         "death": bool(row["dead"]),
         "timeout": not (row["completed"] or row["dead"]),
@@ -64,6 +74,8 @@ class VecCornichon:
         next_level,
         envs_per_service=16,
         max_steps=1500,
+        time_base=300,
+        time_per_tile=6,
         repeat=4,
         reward=RewardConfig(),
         view_width=31,
@@ -72,6 +84,8 @@ class VecCornichon:
         self.num_envs = num_envs
         self.next_level = next_level
         self.max_steps = max_steps
+        self.time_base = time_base
+        self.time_per_tile = time_per_tile
         self.repeat = repeat
         self.reward = reward
         self.height, self.width = view_height, view_width
@@ -88,6 +102,22 @@ class VecCornichon:
         self.returns = np.zeros(num_envs)
         self.parts = [{} for _ in range(num_envs)]
         self.start_distance = [0] * num_envs
+        self.limits = np.full(num_envs, max_steps)
+
+    @classmethod
+    def from_config(cls, num_envs, next_level, env_config, reward=RewardConfig()):
+        return cls(
+            num_envs,
+            next_level,
+            envs_per_service=env_config.envs_per_service,
+            max_steps=env_config.max_steps,
+            time_base=env_config.time_base,
+            time_per_tile=env_config.time_per_tile,
+            repeat=env_config.repeat,
+            reward=reward,
+            view_width=env_config.view_width,
+            view_height=env_config.view_height,
+        )
 
     def _locate(self, env):
         for service, part in zip(self.services, self.slices):
@@ -109,13 +139,14 @@ class VecCornichon:
                 self.returns[env] = 0.0
                 self.parts[env] = {}
                 self.start_distance[env] = row["door_distance"]
+                self.limits[env] = time_limit(row["door_distance"], self.max_steps, self.time_base, self.time_per_tile)
 
     def reset(self):
         self._reset_envs(range(self.num_envs))
         return self._batch_obs()
 
     def _obs(self, env):
-        return observe(self.rows[env], self.steps[env], self.max_steps, self.height, self.width)
+        return observe(self.rows[env], self.steps[env], self.limits[env], self.height, self.width)
 
     def _batch_obs(self):
         obs = [self._obs(i) for i in range(self.num_envs)]
@@ -147,9 +178,11 @@ class VecCornichon:
                 self.parts[env][key] = self.parts[env].get(key, 0.0) + value
             rewards[env] = reward
             terminated[env] = row["completed"] or row["dead"]
-            truncated[env] = not terminated[env] and self.steps[env] >= self.max_steps
+            truncated[env] = not terminated[env] and self.steps[env] >= self.limits[env]
             if terminated[env] or truncated[env]:
-                episodes.append(episode_summary(row, int(self.steps[env]), float(self.returns[env]), self.parts[env], self.start_distance[env]))
+                episodes.append(episode_summary(
+                    row, int(self.steps[env]), int(self.limits[env]), float(self.returns[env]), self.parts[env], self.start_distance[env]
+                ))
                 if truncated[env]:
                     final_obs[env] = self._obs(env)
                 finished.append(env)
@@ -171,9 +204,14 @@ class CornichonEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, difficulty=1, max_steps=1500, repeat=4, reward=RewardConfig(), view_width=31, view_height=21):
+    def __init__(
+        self, difficulty=1, max_steps=1500, time_base=300, time_per_tile=6, repeat=4, reward=RewardConfig(),
+        view_width=31, view_height=21,
+    ):
         self.difficulty = difficulty
         self.max_steps = max_steps
+        self.time_base, self.time_per_tile = time_base, time_per_tile
+        self.limit = max_steps
         self.repeat = repeat
         self.reward = reward
         self.height, self.width = view_height, view_width
@@ -189,7 +227,9 @@ class CornichonEnv(gym.Env):
         difficulty = (options or {}).get("difficulty", self.difficulty)
         self.row = self.service.reset([0], [level_seed], [difficulty])[0]
         self.steps = 0
-        return observe(self.row, 0, self.max_steps, self.height, self.width), {"seed": level_seed, "difficulty": difficulty}
+        self.limit = time_limit(self.row["door_distance"], self.max_steps, self.time_base, self.time_per_tile)
+        info = {"seed": level_seed, "difficulty": difficulty, "time_limit": self.limit}
+        return observe(self.row, 0, self.limit, self.height, self.width), info
 
     def step(self, action):
         if not self.action_space.contains(np.asarray(action)):
@@ -200,9 +240,9 @@ class CornichonEnv(gym.Env):
         self.row = row
         self.steps += 1
         terminated = bool(row["completed"] or row["dead"])
-        truncated = not terminated and self.steps >= self.max_steps
+        truncated = not terminated and self.steps >= self.limit
         info = {"reward_parts": parts, "completed": row["completed"], "dead": row["dead"], "score": row["score"]}
-        return observe(row, self.steps, self.max_steps, self.height, self.width), reward, terminated, truncated, info
+        return observe(row, self.steps, self.limit, self.height, self.width), reward, terminated, truncated, info
 
     def close(self):
         self.service.close()

@@ -7,7 +7,9 @@ wandb_mode: online
 env:
   num_envs: 128
   envs_per_service: 16   # 8 Java processes; ~8k env steps/s on d5
-  max_steps: 750         # decisions per level = 50 s; the scripted bot finishes in ~110
+  max_steps: 1500        # cap; per level: 300 + 6 x path length (d1 ~630, d10 ~1350 decisions)
+  time_base: 300
+  time_per_tile: 6
   repeat: 4              # 15 decisions per second
 
 ppo:
@@ -30,5 +32,7 @@ curriculum:
 eval:
   every_updates: 50
   episodes: 100
+  sweep_every_updates: 200
+  sweep_episodes: 20
 
 reward: {}   # RewardConfig defaults (cornichon_rl/reward.py)

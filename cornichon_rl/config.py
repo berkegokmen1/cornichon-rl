@@ -12,7 +12,11 @@ from .reward import RewardConfig
 class EnvConfig:
     num_envs: int = 64
     envs_per_service: int = 16  # levels per Java process; processes simulate in parallel
-    max_steps: int = 750  # decisions per episode (50 s of game time at repeat 4)
+    # Time limit per level = time_base + time_per_tile * shortest path at the start, capped at max_steps (decisions).
+    # Difficulty 1 (~55 tiles) gets ~630, difficulty 10 (~175 tiles) 1350. time_per_tile 0 = always max_steps.
+    max_steps: int = 1500
+    time_base: int = 300
+    time_per_tile: int = 6
     repeat: int = 4  # game frames per decision
     view_width: int = 31
     view_height: int = 21
@@ -37,7 +41,9 @@ class PPOConfig:
 @dataclass
 class EvalConfig:
     every_updates: int = 50
-    episodes: int = 100  # held-out seeds per evaluation
+    episodes: int = 100  # held-out seeds per evaluation, at the current curriculum difficulty
+    sweep_every_updates: int = 200  # also evaluate every difficulty up to current + 1 (forgetting / readiness)
+    sweep_episodes: int = 20  # held-out seeds per difficulty in a sweep
     greedy: bool = True
 
 

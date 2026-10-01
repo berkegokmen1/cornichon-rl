@@ -11,7 +11,7 @@ import torch
 from PIL import Image, ImageDraw
 
 from .curriculum import eval_seeds
-from .env import observe
+from .env import observe, time_limit
 from .evaluate import load_policy
 from .model import to_tensors
 from .service import SimService
@@ -51,17 +51,17 @@ def draw(snapshot, caption):
 
 def record(model, env_config, seed, difficulty, device, greedy=True, max_steps=None):
     service = SimService(1, env_config.view_width, env_config.view_height)
-    max_steps = max_steps or env_config.max_steps
     frames = []
     try:
         row = service.reset([0], [seed], [difficulty])[0]
-        for step in range(max_steps):
+        limit = max_steps or time_limit(row["door_distance"], env_config.max_steps, env_config.time_base, env_config.time_per_tile)
+        for step in range(limit):
             outcome = "door!" if row["completed"] else "died" if row["dead"] else ""
             caption = f"seed {seed}  difficulty {difficulty}  step {step}  HP {row['health']:.0f}  {outcome}"
             frames.append(draw(service.snapshot(0), caption))
             if row["completed"] or row["dead"]:
                 break
-            obs = observe(row, step, env_config.max_steps, env_config.view_height, env_config.view_width)
+            obs = observe(row, step, limit, env_config.view_height, env_config.view_width)
             obs = {k: v[None] for k, v in obs.items()}
             action = model.act(to_tensors(obs, device), greedy=greedy)[0][0].cpu().numpy()
             service.send_step([action], env_config.repeat)

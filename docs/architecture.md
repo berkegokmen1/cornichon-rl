@@ -33,7 +33,8 @@ Python runs several services (default 16 levels each) and steps them concurrentl
   distance to door, difficulty, sub-cell position, fraction of time limit used.
 * Action `MultiDiscrete([3,2,2,3,3])`: move none/left/right, jump (a key press: first frame only), spell
   (buff costs 70 mana), sphere x none/left/right, sphere y none/up/down. Held for 4 frames → 15 decisions/s.
-* Episode = one level: door → success, health ≤ 0 → death, 750 decisions → truncated (bootstrapped in PPO).
+* Episode = one level: door → success, health ≤ 0 → death, time limit → truncated (bootstrapped in PPO). The limit is
+  300 + 6 decisions per tile of shortest path from the start (capped at 1500), so bigger mazes get more time.
 
 ## Game mechanics that matter for learning
 
@@ -47,4 +48,19 @@ Python runs several services (default 16 levels each) and steps them concurrentl
 
 Difficulty 1 → 10 (the game's levels). Promote when the last 200 episodes at the current difficulty reach 80%
 success; 20% of episodes replay easier difficulties. Training seeds ∈ [0, 100000); evaluation seeds ≥ 1,000,000,
-so evaluation always plays unseen mazes.
+so evaluation always plays unseen mazes. Every 200 updates a sweep evaluates 20 such mazes at every difficulty up to
+current + 1.
+
+What difficulty changes (`LevelWriter`, mean over 20 mazes):
+
+| difficulty | maze | path to door | mobs | wizards | spikes | potions |
+|---|---|---|---|---|---|---|
+| 1 | 29×17 | 55 | 6 | 2 | 2 | 4 |
+| 3 | 37×25 | 81 | 12 | 4 | 4 | 7 |
+| 5 | 45×29 | 105 | 19 | 7 | 7 | 8 |
+| 7 | 53×37 | 133 | 38 | 13 | 13 | 8 |
+| 9 | 61×41 | 163 | 67 | 25 | 23 | 7 |
+| 10 | 65×45 | 175 | 131 | 53 | 46 | 0 |
+
+Difficulty 10 places a mob on every free floor spot (mob chance `1/(6 − d/2)` = 1), so no potions: the original
+game's final level.

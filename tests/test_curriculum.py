@@ -31,3 +31,12 @@ def test_state_round_trip():
     b = Curriculum(CurriculumConfig(window=5), np.random.default_rng(99))
     b.load_state_dict(a.state_dict())
     assert [a.sample() for _ in range(5)] == [b.sample() for _ in range(5)]
+
+
+def test_sweep_reports_every_difficulty():
+    from cornichon_rl.config import EnvConfig
+    from cornichon_rl.evaluate import sweep
+
+    result = sweep("random", [1, 2, 3], eval_seeds(2), EnvConfig(max_steps=20, envs_per_service=4))
+    assert sorted(result) == [1, 2, 3]
+    assert all(r["episodes"] == 2 and r["success"] + r["death"] + r["timeout"] == 1 for r in result.values())

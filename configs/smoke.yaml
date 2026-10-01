@@ -20,3 +20,5 @@ ppo:
 eval:
   every_updates: 2
   episodes: 4
+  sweep_every_updates: 2
+  sweep_episodes: 2

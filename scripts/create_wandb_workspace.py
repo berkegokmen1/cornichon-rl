@@ -8,7 +8,7 @@ ENTITY, PROJECT = "berkegokmen1", "cornichon-rl"
 
 READ_ME = """\
 **What is training:** PPO plays the real Cornichon game (headless Java, Box2D, the game's own maze generator).
-One episode = one level; the episode ends at the door (**success**), on death, or after 750 decisions (timeout).
+One episode = one level; the episode ends at the door (**success**), on death, or at the time limit: 300 + 6 decisions per tile of path to the door (timeout).
 The sphere rests on the player's head and blocks jumps unless it is moved aside first, so climbing needs both.
 The curriculum starts at difficulty 1 and moves up one difficulty when the last 200 episodes at the current one
 succeed at least 80% of the time (`curriculum/difficulty`). 20% of episodes replay easier difficulties.
@@ -21,6 +21,9 @@ The reward the policy maximises is the sum of the `reward_parts/*` terms.
 - `reward_parts/*`: per-episode sum of each reward term; shows which term drives the return.
 - `eval/*`: greedy policy on 100 **held-out mazes** (seeds ≥ 1,000,000, never trained on) at the current difficulty.
   Drops right after a promotion are expected: the difficulty just went up.
+- `eval_sweep/dNN/*`: every 200 updates, 20 held-out mazes at **every** difficulty up to current + 1: shows
+  forgetting of easier levels and readiness for the next one. Difficulty = bigger maze, longer route, more enemies
+  (d1: 29x17, 6 mobs; d10: 65x45, 131 mobs and no potions, the original game's formula).
 - `ppo/*`: optimizer health. approx KL ≲ 0.02 and clip fraction ≲ 0.2 are normal; explained variance → 1 means the critic tracks returns.
 - `system/*`: throughput. The x axis everywhere is environment steps (agent decisions).
 """
@@ -108,6 +111,15 @@ workspace = ws.Workspace(
                 line("held-out return", "eval/return"),
                 line("held-out episode length", "eval/length"),
                 line("held-out tiles gained toward the door", "eval/progress"),
+            ],
+        ),
+        section(
+            "04b Every Difficulty (sweep)",
+            [
+                line("held-out success per difficulty", *[f"eval_sweep/d{d:02d}/success" for d in range(1, 11)]),
+                line("held-out progress per difficulty", *[f"eval_sweep/d{d:02d}/progress" for d in range(1, 11)]),
+                line("held-out deaths per difficulty", *[f"eval_sweep/d{d:02d}/death" for d in range(1, 11)]),
+                line("held-out timeouts per difficulty", *[f"eval_sweep/d{d:02d}/timeout" for d in range(1, 11)]),
             ],
         ),
         section(
