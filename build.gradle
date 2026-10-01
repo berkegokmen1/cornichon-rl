@@ -74,3 +74,19 @@ project(":headless") {
         runtimeOnly "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
     }
 }
+
+// Films a policy playing the real game: the headless protocol inside a libGDX window, frames piped to ffmpeg.
+project(":recorder") {
+    apply plugin: "application"
+    application {
+        mainClass = "com.cornichon.headless.Recorder"
+        applicationDefaultJvmArgs = ["-Xmx2g"]
+    }
+    dependencies {
+        implementation project(":headless")
+        implementation project(":core")
+        implementation "com.badlogicgames.gdx:gdx-backend-lwjgl:$gdxVersion"
+        runtimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+        runtimeOnly "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
+    }
+}

@@ -48,7 +48,16 @@ python -m cornichon_rl.render --checkpoint weights/cornichon_fighter.pt --diffic
 python -m cornichon_rl.evaluate --policy random --difficulties 1 2 3
 ```
 
-`--stochastic` samples actions the way the agent was trained and evaluated. The argmax policy (no flag) can get
+Film it in the actual game (real sprites, camera and HUD, 60 fps mp4). This needs ffmpeg and a JDK with AWT
+(`openjdk-17-jdk`, not `-headless`). On a desktop a game window opens and you can watch it play live; on a server
+with no display it starts its own Xvfb (`sudo apt install xvfb`):
+
+```bash
+./gradlew :recorder:installDist
+python -m cornichon_rl.record --checkpoint weights/cornichon_fighter.pt --difficulty 2 --seeds 1000000 1000001 --out-dir videos/
+```
+
+`--stochastic` (evaluate, render) samples actions the way the agent was trained and evaluated; `record` samples by default. The argmax policy (no flag) can get
 stuck in loops. To train your own, see [README_RL.md](README_RL.md).
 
 ## **Cornichon**

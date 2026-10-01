@@ -1,1 +1,1 @@
-include 'desktop', 'core', 'headless'
+include 'desktop', 'core', 'headless', 'recorder'

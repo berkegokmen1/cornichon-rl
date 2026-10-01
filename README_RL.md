@@ -33,7 +33,8 @@ scripts/train.sh 0 ppo_v1 --resume             # continue /data/local/berke/corn
 python -m cornichon_rl.ppo --config configs/smoke.yaml        # 20-second CPU plumbing check
 python -m cornichon_rl.evaluate --checkpoint RUN_DIR/best.pt --difficulties 1 2 3 --episodes 100
 python -m cornichon_rl.evaluate --policy random --difficulties 1 5 10                # baseline
-python -m cornichon_rl.render --checkpoint RUN_DIR/best.pt --out demo.gif          # GIF of held-out mazes
+python -m cornichon_rl.render --checkpoint RUN_DIR/best.pt --out demo.gif          # GIF of held-out mazes (debug view)
+python -m cornichon_rl.record --checkpoint RUN_DIR/best.pt --difficulty 2 --out-dir videos/   # mp4 in the real game (recorder/)
 python scripts/scripted_bot.py --difficulty 1                                       # solvability check
 python scripts/create_wandb_workspace.py      # curated W&B view (berkegokmen1/cornichon-rl)
 python scripts/export_weights.py RUN_DIR/best.pt weights/NAME --run RUN --benchmark bench.json   # release file + model card

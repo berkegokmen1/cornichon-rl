@@ -111,10 +111,14 @@ public class LevelRenderer {
     level.getSphere().draw(spriteBatch);
   }
 
+  private BitmapFont font;
+
   private void drawHudTexts() {
-    final BitmapFont font = new BitmapFont();
-    font.getData().setScale(0.14f, 0.045f);
-    font.setColor(Color.WHITE);
+    if (font == null) { // was created every frame, leaking a texture per frame
+      font = new BitmapFont();
+      font.getData().setScale(0.14f, 0.045f);
+      font.setColor(Color.WHITE);
+    }
 
     font.draw(spriteBatch, (level.getDifficulty() <= 9 ? level.getDifficulty() + "" : "X"), -6.5f, 4.03f);
   }

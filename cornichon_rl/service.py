@@ -13,6 +13,7 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parent.parent
 LAUNCHER = REPO / "headless" / "build" / "install" / "headless" / "bin" / "headless"
+RECORDER = REPO / "recorder" / "build" / "install" / "recorder" / "bin" / "recorder"  # same protocol, films the game
 
 # Bit order of the grid bytes, matching Simulation.java.
 GRID_CHANNELS = (
@@ -30,16 +31,17 @@ class SimulatorError(RuntimeError):
 
 
 class SimService:
-    def __init__(self, num_envs, view_width=31, view_height=21, launcher=LAUNCHER):
+    def __init__(self, num_envs, view_width=31, view_height=21, launcher=LAUNCHER, extra_args=(), env=None):
         if not Path(launcher).exists():
             raise FileNotFoundError(f"{launcher} missing; build it with ./gradlew :headless:installDist")
         self.num_envs = num_envs
         self.proc = subprocess.Popen(
-            [str(launcher), f"--envs={num_envs}", f"--view-width={view_width}", f"--view-height={view_height}", "--grid-bytes=2"],
+            [str(launcher), f"--envs={num_envs}", f"--view-width={view_width}", f"--view-height={view_height}", "--grid-bytes=2", *extra_args],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             bufsize=1 << 20,
+            env=env,
         )
         hello = self._read()
         self.view_width = hello["view_width"]

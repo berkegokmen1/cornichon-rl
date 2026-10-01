@@ -60,36 +60,8 @@ public final class HeadlessService {
       boolean close = false;
       try {
         JsonValue request = reader.parse(line);
-        String op = request.getString("op");
-        if (op.equals("reset")) {
-          int[] ids = request.get("ids").asIntArray();
-          long[] seeds = request.get("seeds").asLongArray();
-          int[] difficulties = request.get("difficulties").asIntArray();
-          // optional: denser mobs than the maze size implies (training only); defaults to the game's density
-          int[] monsters = request.has("monster_difficulties") ? request.get("monster_difficulties").asIntArray() : difficulties;
-          // optional: the door does nothing (combat practice; the level ends when every mob is dead)
-          boolean[] closed = new boolean[ids.length];
-          if (request.has("door_closed")) closed = request.get("door_closed").asBooleanArray();
-          for (int i = 0; i < ids.length; i++) sims[ids[i]].reset(seeds[i], difficulties[i], monsters[i], closed[i]);
-          response = envsJson(sims, ids);
-        } else if (op.equals("step")) {
-          JsonValue actions = request.get("actions");
-          int repeat = request.getInt("repeat", 4);
-          if (actions.size != envs) throw new IllegalArgumentException("need " + envs + " actions, got " + actions.size);
-          int i = 0;
-          for (JsonValue a = actions.child; a != null; a = a.next, i++) {
-            int[] x = a.asIntArray();
-            sims[i].step(x[0], x[1], x[2], x[3], x[4], repeat);
-          }
-          response = envsJson(sims, null);
-        } else if (op.equals("snapshot")) {
-          response = sims[request.getInt("id")].snapshotJson();
-        } else if (op.equals("close")) {
-          response = "{\"ok\":true}";
-          close = true;
-        } else {
-          throw new IllegalArgumentException("unknown op " + op);
-        }
+        close = request.getString("op").equals("close");
+        response = handle(sims, request);
       } catch (Exception e) {
         e.printStackTrace();
         response = "{\"error\":\"" + escape(String.valueOf(e)) + "\"}";
@@ -101,7 +73,40 @@ public final class HeadlessService {
     for (Simulation sim : sims) sim.dispose();
   }
 
-  private static String escape(String text) {
+  /** One request -> its JSON response. Shared with the recorder (recorder/), which runs the same protocol. */
+  static String handle(Simulation[] sims, JsonValue request) {
+    int envs = sims.length;
+    String op = request.getString("op");
+    if (op.equals("reset")) {
+      int[] ids = request.get("ids").asIntArray();
+      long[] seeds = request.get("seeds").asLongArray();
+      int[] difficulties = request.get("difficulties").asIntArray();
+      // optional: denser mobs than the maze size implies (training only); defaults to the game's density
+      int[] monsters = request.has("monster_difficulties") ? request.get("monster_difficulties").asIntArray() : difficulties;
+      // optional: the door does nothing (combat practice; the level ends when every mob is dead)
+      boolean[] closed = new boolean[ids.length];
+      if (request.has("door_closed")) closed = request.get("door_closed").asBooleanArray();
+      for (int i = 0; i < ids.length; i++) sims[ids[i]].reset(seeds[i], difficulties[i], monsters[i], closed[i]);
+      return envsJson(sims, ids);
+    } else if (op.equals("step")) {
+      JsonValue actions = request.get("actions");
+      int repeat = request.getInt("repeat", 4);
+      if (actions.size != envs) throw new IllegalArgumentException("need " + envs + " actions, got " + actions.size);
+      int i = 0;
+      for (JsonValue a = actions.child; a != null; a = a.next, i++) {
+        int[] x = a.asIntArray();
+        sims[i].step(x[0], x[1], x[2], x[3], x[4], repeat);
+      }
+      return envsJson(sims, null);
+    } else if (op.equals("snapshot")) {
+      return sims[request.getInt("id")].snapshotJson();
+    } else if (op.equals("close")) {
+      return "{\"ok\":true}";
+    }
+    throw new IllegalArgumentException("unknown op " + op);
+  }
+
+  static String escape(String text) {
     StringBuilder out = new StringBuilder();
     for (char c : text.toCharArray()) {
       if (c == '"' || c == '\\') out.append('\\').append(c); else if (c < 0x20) out.append(' '); else out.append(c);
@@ -109,7 +114,7 @@ public final class HeadlessService {
     return out.toString();
   }
 
-  private static String envsJson(Simulation[] sims, int[] ids) {
+  static String envsJson(Simulation[] sims, int[] ids) {
     StringBuilder json = new StringBuilder("{\"envs\":[");
     int n = ids == null ? sims.length : ids.length;
     for (int i = 0; i < n; i++) {

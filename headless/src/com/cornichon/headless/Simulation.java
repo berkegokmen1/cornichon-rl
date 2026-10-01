@@ -46,6 +46,8 @@ final class Simulation {
 
   private Level level;
   private PlayerController controller;
+  // Called after every game frame (the recorder draws and captures it there); null in training.
+  Runnable onFrame;
   private int[][] map;
   private int[][] doorDistance;
 
@@ -110,11 +112,18 @@ final class Simulation {
       controller.update(input, FRAME);
       level.tick();
       frames++;
+      if (onFrame != null) {
+        onFrame.run();
+      }
       damageTaken += Math.max(0f, healthBefore - player.getHealth());
       if (isDone()) {
         break;
       }
     }
+  }
+
+  Level level() {
+    return level;
   }
 
   boolean isDone() {
