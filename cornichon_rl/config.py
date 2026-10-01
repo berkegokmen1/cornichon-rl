@@ -12,7 +12,7 @@ from .reward import RewardConfig
 class EnvConfig:
     num_envs: int = 64
     envs_per_service: int = 16  # levels per Java process; processes simulate in parallel
-    max_steps: int = 1500  # decisions per episode (100 s of game time at repeat 4)
+    max_steps: int = 750  # decisions per episode (50 s of game time at repeat 4)
     repeat: int = 4  # game frames per decision
     view_width: int = 31
     view_height: int = 21

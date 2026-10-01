@@ -8,7 +8,8 @@ ENTITY, PROJECT = "berkegokmen1", "cornichon-rl"
 
 READ_ME = """\
 **What is training:** PPO plays the real Cornichon game (headless Java, Box2D, the game's own maze generator).
-One episode = one level; the episode ends at the door (**success**), on death, or after 1500 decisions (timeout).
+One episode = one level; the episode ends at the door (**success**), on death, or after 750 decisions (timeout).
+The sphere rests on the player's head and blocks jumps unless it is moved aside first, so climbing needs both.
 The curriculum starts at difficulty 1 and moves up one difficulty when the last 200 episodes at the current one
 succeed at least 80% of the time (`curriculum/difficulty`). 20% of episodes replay easier difficulties.
 
@@ -76,6 +77,7 @@ workspace = ws.Workspace(
                 line("how episodes end", "rollout/success", "rollout/death", "rollout/timeout"),
                 line("episode return", "rollout/return", "rollout_window/return"),
                 line("episode length (decisions)", "rollout/length"),
+                line("tiles gained toward the door per episode", "rollout/progress", "rollout_window/progress"),
             ],
         ),
         section(
@@ -105,6 +107,7 @@ workspace = ws.Workspace(
                 line("held-out outcomes", "eval/success", "eval/death", "eval/timeout"),
                 line("held-out return", "eval/return"),
                 line("held-out episode length", "eval/length"),
+                line("held-out tiles gained toward the door", "eval/progress"),
             ],
         ),
         section(

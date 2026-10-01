@@ -87,7 +87,7 @@ def episode_metrics(episodes, prefix):
     if not episodes:
         return {}
     metrics = {f"{prefix}/episodes": len(episodes)}
-    for key in ("return", "length", "success", "death", "timeout", "mobs_killed", "damage", "collected", "score"):
+    for key in ("return", "length", "success", "death", "timeout", "progress", "mobs_killed", "damage", "collected", "score"):
         metrics[f"{prefix}/{key}"] = float(np.mean([float(e[key]) for e in episodes]))
     for part in episodes[0]["parts"]:
         metrics[f"reward_parts/{part}"] = float(np.mean([e["parts"].get(part, 0.0) for e in episodes]))

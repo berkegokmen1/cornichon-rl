@@ -6,11 +6,11 @@ score is logged (`rollout/score`) but never trained on.
 | Term | Default | Note |
 |---|---:|---|
 | level complete | +10 | the objective |
-| death | −5 | on top of the damage that caused it |
+| death | −2 | on top of the damage that caused it. −5 in `ppo_curriculum_v1` collapsed into "never move, never die" (99% timeouts) |
 | mob killed | +0.5 | per kill (sphere hits) |
-| damage taken | −0.02 / HP | mobs, spikes, fireballs; 100 HP = −2 |
+| damage taken | −0.01 / HP | mobs, spikes, fireballs; 100 HP = −1 |
 | potion collected | +0.1 | |
 | step | −0.001 | per decision; −1.5 over a full timeout |
-| path progress | +0.05 / tile | shortest 4-connected path to the door (BFS over bricks, ignores gravity). Telescopes to 0.05 × (start − end distance), so it cannot be farmed; skipped when the player's cell has no path |
+| path progress | +0.2 / tile | shortest 4-connected path to the door (BFS over bricks, ignores gravity). Telescopes to 0.2 × (start − end distance), so it cannot be farmed (a level starts 40–80 tiles away); skipped when the player's cell has no path |
 
 `reward_parts/*` in W&B shows each term's per-episode sum. Change any term with `reward.<name>=value`.

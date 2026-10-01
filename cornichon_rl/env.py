@@ -12,7 +12,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from .reward import RewardConfig, step_reward
+from .reward import UNREACHABLE, RewardConfig, step_reward
 from .service import ACTION_NVEC, GRID_CHANNELS, SimService, decode_grid
 
 STATE_SIZE = 17
@@ -32,7 +32,7 @@ def observe(row, steps, max_steps, height, width):
     return {"grid": decode_grid(row, height, width), "state": state}
 
 
-def episode_summary(row, steps, episode_return, parts):
+def episode_summary(row, steps, episode_return, parts, start_distance):
     return {
         "return": episode_return,
         "length": steps,
@@ -46,6 +46,8 @@ def episode_summary(row, steps, episode_return, parts):
         "collected": row["collected"],
         "score": row["score"],
         "door_distance": row["door_distance"],
+        # tiles of shortest path to the door gained over the episode (0 when the path was unknown at either end)
+        "progress": start_distance - row["door_distance"] if max(start_distance, row["door_distance"]) < UNREACHABLE else 0,
         "parts": dict(parts),
     }
 
@@ -85,6 +87,7 @@ class VecCornichon:
         self.steps = np.zeros(num_envs, dtype=int)
         self.returns = np.zeros(num_envs)
         self.parts = [{} for _ in range(num_envs)]
+        self.start_distance = [0] * num_envs
 
     def _locate(self, env):
         for service, part in zip(self.services, self.slices):
@@ -105,6 +108,7 @@ class VecCornichon:
                 self.steps[env] = 0
                 self.returns[env] = 0.0
                 self.parts[env] = {}
+                self.start_distance[env] = row["door_distance"]
 
     def reset(self):
         self._reset_envs(range(self.num_envs))
@@ -145,7 +149,7 @@ class VecCornichon:
             terminated[env] = row["completed"] or row["dead"]
             truncated[env] = not terminated[env] and self.steps[env] >= self.max_steps
             if terminated[env] or truncated[env]:
-                episodes.append(episode_summary(row, int(self.steps[env]), float(self.returns[env]), self.parts[env]))
+                episodes.append(episode_summary(row, int(self.steps[env]), float(self.returns[env]), self.parts[env], self.start_distance[env]))
                 if truncated[env]:
                     final_obs[env] = self._obs(env)
                 finished.append(env)

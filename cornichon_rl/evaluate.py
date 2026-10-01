@@ -62,6 +62,7 @@ def evaluate(policy, difficulty, seeds, env_config, reward=RewardConfig(), devic
         "timeout": float(np.mean([e["timeout"] for e in episodes])),
         "return": float(np.mean([e["return"] for e in episodes])),
         "length": float(np.mean([e["length"] for e in episodes])),
+        "progress": float(np.mean([e["progress"] for e in episodes])),
         "mobs_killed": float(np.mean([e["mobs_killed"] for e in episodes])),
         "score": float(np.mean([e["score"] for e in episodes])),
     }

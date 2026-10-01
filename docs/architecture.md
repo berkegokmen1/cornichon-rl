@@ -33,7 +33,15 @@ Python runs several services (default 16 levels each) and steps them concurrentl
   distance to door, difficulty, sub-cell position, fraction of time limit used.
 * Action `MultiDiscrete([3,2,2,3,3])`: move none/left/right, jump (a key press: first frame only), spell
   (buff costs 70 mana), sphere x none/left/right, sphere y none/up/down. Held for 4 frames → 15 decisions/s.
-* Episode = one level: door → success, health ≤ 0 → death, 1500 decisions → truncated (bootstrapped in PPO).
+* Episode = one level: door → success, health ≤ 0 → death, 750 decisions → truncated (bootstrapped in PPO).
+
+## Game mechanics that matter for learning
+
+* The sphere is pulled toward the player and its velocity is zeroed on every frame no sphere key is held, so when
+  idle it rests on the player's head (0.62 above) and **blocks jumps** (0.2 tiles instead of 4.9). Moving it aside
+  or up first restores the full jump. Same code as the desktop game.
+* Any brick contact counts as ground, side walls included, so the player can jump again while touching a wall.
+* `scripts/scripted_bot.py` follows the BFS path with the sphere held up: a solvability check, not a strong player.
 
 ## Curriculum and seeds
 

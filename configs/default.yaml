@@ -7,7 +7,7 @@ wandb_mode: online
 env:
   num_envs: 128
   envs_per_service: 16   # 8 Java processes; ~8k env steps/s on d5
-  max_steps: 1500        # decisions per level = 100 s of game time
+  max_steps: 750         # decisions per level = 50 s; the scripted bot finishes in ~110
   repeat: 4              # 15 decisions per second
 
 ppo:

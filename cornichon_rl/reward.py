@@ -11,14 +11,14 @@ UNREACHABLE = 2**31 - 1  # Simulation.UNREACHABLE: the player's cell has no path
 @dataclass(frozen=True)
 class RewardConfig:
     level_complete: float = 10.0
-    death: float = -5.0
+    death: float = -2.0
     mob_killed: float = 0.5
-    damage_per_hp: float = -0.02  # losing all 100 HP costs 2, on top of the death penalty
+    damage_per_hp: float = -0.01  # losing all 100 HP costs 1, on top of the death penalty
     collected: float = 0.1  # health or mana potion
     step: float = -0.001  # per agent decision
     # Progress shaping: + per tile the shortest path to the door gets shorter, - per tile it gets longer. It
     # telescopes over an episode to path_progress * (start distance - end distance), so it cannot be farmed.
-    path_progress: float = 0.05
+    path_progress: float = 0.2
 
     @classmethod
     def from_dict(cls, values):
