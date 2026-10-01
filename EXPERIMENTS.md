@@ -33,8 +33,9 @@ logs in `/data/local/berke/cornichon-rl/logs/<name>.log`. W&B: `berkegokmen1/cor
 | ~09-30 21:15 | same, greedy vs sampled actions | greedy 57/17/26 (success/death/timeout) vs sampled 60/27/13: sampling breaks loops; then mobs kill it. Kills 0.15–0.2/episode |
 | ~09-30 23:10 | why kills stay low | sphere reach ≈ 1.6 tiles sideways (spring pulls it back), touching a mob hurts, a kill needs 4 separate hits (25 vs 100 HP, knock-back after each), the 50-damage buff costs 70 mana at 10 per potion |
 | ~09-30 22:30 | simulator install | a stale core jar went live for ~3.5 min; no run hit an eval in that window. Installs now go through `scripts/install_simulator.sh` (tests both protocol formats before swapping) |
-
 | 10-01 07:30 | `scripts/diagnose_arena.py`, arena_v1 best.pt, 60 held-out density-2 arenas | 10 cleared / 20 death / 30 timeout. Timed-out arenas: median **3 of 8 mobs left**, all reachable, median **40 tiles** of path away; median **305 steps since the last kill**. It fights well up close, then **stops hunting**: survivors are outside its 31×21 view and nothing points to them (the door has a compass in the state; mobs do not) |
+| 10-01 11:40 | **release benchmark**: 200 held-out mazes per difficulty d1–d6, sampled actions, `ppo_v3` final, `ppo_v4_combat` best + final, `game_from_arena_v1` update 1960. Results in `/data/local/berke/cornichon-rl/bench/` (cthulhu1) | success d1–d6: v4 best **91/82/71/42/40/16**, v4 final 94/77/64/44/38/16, v3 92/80/73/44/35/16, arena-pretrained 90/70/59/41/28/14. Arena-pretrained kills 3.7–9.1/level (v4: 0.8–1.7), deaths 8–49% (v4: 8–76%), but timeouts 18–41% from d2 on (v4: 0–10%): it fights instead of finishing. The 20-level in-training sweeps had hidden this |
+| 10-01 12:00 | released `weights/cornichon_ppo_v4` (= `ppo_v4_combat/best.pt`) and `weights/cornichon_fighter` (= `game_from_arena_v1` update 1960, to be replaced by its final checkpoint) with `scripts/export_weights.py`; README "Pretrained agents" section, GIFs in `docs/media/` (held-out d2 seed 1000003, both reach the door) | |
 
 ## Two-phase plan (09-30 23:30, berke's idea)
 

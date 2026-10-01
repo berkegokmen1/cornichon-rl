@@ -36,6 +36,7 @@ python -m cornichon_rl.evaluate --policy random --difficulties 1 5 10           
 python -m cornichon_rl.render --checkpoint RUN_DIR/best.pt --out demo.gif          # GIF of held-out mazes
 python scripts/scripted_bot.py --difficulty 1                                       # solvability check
 python scripts/create_wandb_workspace.py      # curated W&B view (berkegokmen1/cornichon-rl)
+python scripts/export_weights.py RUN_DIR/best.pt weights/NAME --run RUN --benchmark bench.json   # release file + model card
 ```
 
 Any config key can be overridden on the command line: `ppo.lr=1e-4 env.num_envs=128 reward.death=-10`.

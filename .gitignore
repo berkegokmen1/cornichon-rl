@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 wandb/
 checkpoints/
+
+# release weights (scripts/export_weights.py) are small and tracked, despite the global *.pt ignore
+!weights/*.pt

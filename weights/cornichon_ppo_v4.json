@@ -1,0 +1,70 @@
+{
+ "run": "ppo_v4_combat",
+ "wandb": "berkegokmen1/cornichon-rl/runs/7u3j82aa",
+ "commit": "e65bf7e",
+ "update": 3050,
+ "env_steps": 49971200,
+ "curriculum_difficulty": 3,
+ "grid_channels": 10,
+ "state_size": 17,
+ "notes": "Best at reaching the door. Pure game training (curriculum d1->d10, monster-dense practice levels). Mostly avoids mobs (~1-2 kills per level); dies to them on large levels.",
+ "benchmark": {
+  "what": "held-out levels (seeds from 1,000,000), sampled actions, evaluate.py --stochastic",
+  "per_difficulty": [
+   {
+    "difficulty": 1,
+    "episodes": 200,
+    "success": 0.91,
+    "death": 0.085,
+    "timeout": 0.005,
+    "mobs_killed": 0.815,
+    "kill_fraction": 0.12074963924963926
+   },
+   {
+    "difficulty": 2,
+    "episodes": 200,
+    "success": 0.825,
+    "death": 0.17,
+    "timeout": 0.005,
+    "mobs_killed": 1.075,
+    "kill_fraction": 0.09255095843698787
+   },
+   {
+    "difficulty": 3,
+    "episodes": 200,
+    "success": 0.71,
+    "death": 0.255,
+    "timeout": 0.035,
+    "mobs_killed": 1.14,
+    "kill_fraction": 0.08043721180817358
+   },
+   {
+    "difficulty": 4,
+    "episodes": 200,
+    "success": 0.42,
+    "death": 0.51,
+    "timeout": 0.07,
+    "mobs_killed": 1.66,
+    "kill_fraction": 0.07047400520044624
+   },
+   {
+    "difficulty": 5,
+    "episodes": 200,
+    "success": 0.395,
+    "death": 0.51,
+    "timeout": 0.095,
+    "mobs_killed": 1.67,
+    "kill_fraction": 0.06488330853636182
+   },
+   {
+    "difficulty": 6,
+    "episodes": 200,
+    "success": 0.16,
+    "death": 0.765,
+    "timeout": 0.075,
+    "mobs_killed": 1.71,
+    "kill_fraction": 0.04242085481521569
+   }
+  ]
+ }
+}

@@ -1,0 +1,70 @@
+{
+ "run": "game_from_arena_v1",
+ "wandb": "berkegokmen1/cornichon-rl/runs/93dqemq2",
+ "commit": "57234aa",
+ "update": 1960,
+ "env_steps": 32112640,
+ "curriculum_difficulty": 3,
+ "grid_channels": 10,
+ "state_size": 17,
+ "notes": "Fighter: arena combat pretraining (arena_v1, door closed, kill every mob) then the game. Kills 4-7x more mobs and dies less than ppo_v4, but times out more (it fights instead of finishing). Snapshot at update ~1950 of 3051; run still training.",
+ "benchmark": {
+  "what": "held-out levels (seeds from 1,000,000), sampled actions, evaluate.py --stochastic",
+  "per_difficulty": [
+   {
+    "difficulty": 1,
+    "episodes": 200,
+    "success": 0.9,
+    "death": 0.08,
+    "timeout": 0.02,
+    "mobs_killed": 3.69,
+    "kill_fraction": 0.5544556970806971
+   },
+   {
+    "difficulty": 2,
+    "episodes": 200,
+    "success": 0.705,
+    "death": 0.115,
+    "timeout": 0.18,
+    "mobs_killed": 5.16,
+    "kill_fraction": 0.46886389876463413
+   },
+   {
+    "difficulty": 3,
+    "episodes": 200,
+    "success": 0.59,
+    "death": 0.18,
+    "timeout": 0.23,
+    "mobs_killed": 5.49,
+    "kill_fraction": 0.3860570075031981
+   },
+   {
+    "difficulty": 4,
+    "episodes": 200,
+    "success": 0.41,
+    "death": 0.215,
+    "timeout": 0.375,
+    "mobs_killed": 7.585,
+    "kill_fraction": 0.32670632989587517
+   },
+   {
+    "difficulty": 5,
+    "episodes": 200,
+    "success": 0.28,
+    "death": 0.31,
+    "timeout": 0.41,
+    "mobs_killed": 7.71,
+    "kill_fraction": 0.2977712974277454
+   },
+   {
+    "difficulty": 6,
+    "episodes": 200,
+    "success": 0.145,
+    "death": 0.49,
+    "timeout": 0.365,
+    "mobs_killed": 9.105,
+    "kill_fraction": 0.22627052804621825
+   }
+  ]
+ }
+}

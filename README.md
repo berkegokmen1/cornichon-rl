@@ -4,7 +4,51 @@ A reinforcement-learning agent for **[Cornichon](https://github.com/Muria1/Corni
 we built as a Bilkent CS102 group project. This repo is that game plus an RL agent that learns to play it: PPO
 trained on the real game code (the same Java/libGDX/Box2D code as the desktop build) through a headless simulator,
 on procedurally generated mazes it has never seen. See **[README_RL.md](README_RL.md)** for how it works and how to
-train. The original game's README follows.
+train. The original game's README follows the agent section.
+
+## Pretrained agents
+
+Two trained policies ship in [`weights/`](weights/) (5.8 MB each). Each has a model card (`.json`) that says
+which run it came from and how it scored. Both are playing a held-out difficulty-2 maze below, one they never saw
+in training:
+
+| `cornichon_ppo_v4`: best at reaching the door | `cornichon_fighter`: arena combat pretraining, then the game |
+|---|---|
+| ![ppo_v4](docs/media/cornichon_ppo_v4.gif) | ![fighter](docs/media/cornichon_fighter.gif) |
+
+Benchmark: 200 held-out mazes per difficulty (seeds 1,000,000+), sampled actions. Each cell is success / death /
+timeout in %, then mobs killed per level.
+
+| difficulty | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| `cornichon_ppo_v4` | **91** / 8 / 0 · 0.8 | **82** / 17 / 0 · 1.1 | **71** / 26 / 4 · 1.1 | **42** / 51 / 7 · 1.7 | **40** / 51 / 10 · 1.7 | **16** / 76 / 8 · 1.7 |
+| `cornichon_fighter` | 90 / 8 / 2 · **3.7** | 70 / 12 / 18 · **5.2** | 59 / 18 / 23 · **5.5** | 41 / 22 / 38 · **7.6** | 28 / 31 / 41 · **7.7** | 14 / 49 / 36 · **9.1** |
+| random policy (100 mazes) | 0 / 80 / 20 · — | — | — | — | 0 / 85 / 15 · — | — |
+
+`ppo_v4` mostly runs past the mobs. The fighter kills 4–7× more mobs and dies far less, but it times out more
+often because it keeps fighting instead of finishing the level. Training that fixes this (a door bonus that grows
+with the share of mobs killed on the way) is in progress; see [EXPERIMENTS.md](EXPERIMENTS.md).
+
+### Run them
+
+You need Java 17 and Python 3.10+. No GPU is needed: the policies run on CPU.
+
+```bash
+git clone https://github.com/berkegokmen1/cornichon-rl.git && cd cornichon-rl
+./gradlew :headless:installDist                  # the real game code, built as a headless simulator
+python -m venv .venv && . .venv/bin/activate
+pip install -e .                                 # torch, gymnasium, numpy, pillow, ...
+
+# win rate on 100 unseen mazes at difficulties 1-3
+python -m cornichon_rl.evaluate --checkpoint weights/cornichon_fighter.pt --difficulties 1 2 3 --episodes 100 --stochastic
+# GIF of it playing four unseen difficulty-2 mazes
+python -m cornichon_rl.render --checkpoint weights/cornichon_fighter.pt --difficulty 2 --stochastic --out fighter.gif
+# baseline
+python -m cornichon_rl.evaluate --policy random --difficulties 1 2 3
+```
+
+`--stochastic` samples actions the way the agent was trained and evaluated. The argmax policy (no flag) can get
+stuck in loops. To train your own, see [README_RL.md](README_RL.md).
 
 ## **Cornichon**
 
