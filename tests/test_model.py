@@ -1,6 +1,6 @@
 import torch
 
-from cornichon_rl.model import ActorCritic
+from cornichon_rl.model import ActorCritic, load_widened
 
 
 def random_obs(*lead):
@@ -41,3 +41,14 @@ def test_feed_forward_ignores_memory_arguments():
     assert model.initial_state(4, "cpu") is None
     action, log_prob, value, state = model.act(obs, None, torch.ones(4))
     assert action.shape == (4, 5) and state is None
+
+
+def test_widened_load_acts_like_the_narrow_model():
+    torch.manual_seed(0)
+    narrow = ActorCritic(state_size=17, grid_channels=8, recurrent=True)
+    wide = ActorCritic(recurrent=True)
+    load_widened(wide, narrow.state_dict())
+    obs = random_obs(4)
+    starts = torch.ones(4)
+    for a, b in zip(narrow(obs, narrow.initial_state(4, "cpu"), starts)[0], wide(obs, wide.initial_state(4, "cpu"), starts)[0]):
+        assert torch.allclose(a, b, atol=1e-6)

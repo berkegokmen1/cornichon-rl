@@ -20,7 +20,7 @@ from .config import load_config, to_dict
 from .curriculum import Curriculum, eval_seeds
 from .env import VecCornichon
 from .evaluate import play_levels, summarize, sweep
-from .model import ActorCritic, to_tensors
+from .model import ActorCritic, load_widened, to_tensors
 
 
 def compute_gae(rewards, values, last_value, dones, gamma, lam):
@@ -174,7 +174,8 @@ def main():
         print(f"resumed {run_dir}/latest.pt at update {update}, {env_steps} env steps, difficulty {curriculum.difficulty}")
     elif config.init_from:
         # weights only (e.g. phase 2 starting from arena pretraining); the optimizer, curriculum and run start fresh
-        model.load_state_dict(torch.load(config.init_from, map_location=device, weights_only=False)["model"])
+        # inputs added after that checkpoint was trained (e.g. the mob compass) start with zero weights
+        load_widened(model, torch.load(config.init_from, map_location=device, weights_only=False)["model"])
         print(f"initialized weights from {config.init_from}")
     with open(run_dir / "config.json", "w") as f:
         json.dump(to_dict(config), f, indent=1)

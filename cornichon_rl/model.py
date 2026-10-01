@@ -108,5 +108,18 @@ class ActorCritic(nn.Module):
         return action, log_prob, value, state
 
 
+def load_widened(model, state_dict):
+    """Load weights from a model that saw fewer grid channels or state features (they are only ever appended).
+    The new inputs get zero weights, so the loaded policy acts exactly as before until training uses them."""
+    state_dict = dict(state_dict)
+    for key in ("grid.0.weight", "state.0.weight"):
+        old, new = state_dict[key], model.state_dict()[key]
+        if old.shape != new.shape:
+            widened = torch.zeros_like(new)
+            widened[:, : old.shape[1]] = old
+            state_dict[key] = widened
+    model.load_state_dict(state_dict)
+
+
 def to_tensors(obs, device):
     return {key: torch.as_tensor(value, device=device) for key, value in obs.items()}

@@ -1,0 +1,47 @@
+# default.yaml + the door pays more the more of the level's mobs were killed on the way (fight through, do not
+# jump over). Meant for phase 2 from an arena checkpoint: init_from=<arena best.pt>.
+# Every key is documented in cornichon_rl/config.py; override any of them on the command line (ppo.lr=1e-4).
+name: ppo_curriculum
+device: cuda
+wandb_mode: online
+
+env:
+  num_envs: 128
+  envs_per_service: 16   # 8 Java processes; ~8k env steps/s on d5
+  max_steps: 1500        # cap; per level: 300 + 6 x path length (d1 ~630, d10 ~1350 decisions)
+  time_base: 300
+  time_per_tile: 6
+  repeat: 4              # 15 decisions per second
+
+model:
+  recurrent: true        # LSTM memory (ppo_curriculum_v2 was feed-forward and got stuck in loops)
+  hidden: 256
+
+ppo:
+  total_steps: 50_000_000
+  horizon: 128
+  epochs: 4
+  minibatches: 8
+  lr: 2.5e-4
+  gamma: 0.995
+  gae_lambda: 0.95
+  entropy_coef: 0.01
+
+curriculum:
+  start: 1
+  end: 10
+  promote_at: 0.8
+  window: 200
+  replay: 0.2
+  monster_practice: 0.5  # half the training levels get mobs of 1-3 difficulties higher (combat practice)
+  monster_boost: 3
+
+eval:
+  every_updates: 50
+  episodes: 100
+  sweep_every_updates: 200
+  sweep_episodes: 20
+  greedy: false          # sample actions like in training; the argmax policy froze in loops (26% vs 13% timeouts)
+
+reward:
+  complete_kill_fraction: 10.0   # full clear doubles the door's 10

@@ -44,3 +44,13 @@ def test_hunt_progress_only_in_arena_and_not_on_kill_steps():
     assert parts["hunt_progress"] == 0.0  # a kill switched the target
     _, parts = step_reward(row(mob_distance=20), row(mob_distance=15), config)
     assert parts["hunt_progress"] == 0.0  # not an arena
+
+
+def test_door_bonus_scales_with_mobs_killed():
+    config = RewardConfig(complete_kill_fraction=10.0)
+    _, parts = step_reward(row(mobs_killed=3, mobs_total=4), row(mobs_killed=3, mobs_total=4, completed=True), config)
+    assert parts["complete_kill_fraction"] == 7.5
+    _, parts = step_reward(row(mobs_killed=3, mobs_total=4), row(mobs_killed=4, mobs_total=4), config)
+    assert parts["complete_kill_fraction"] == 0.0  # only at the door
+    _, parts = step_reward(row(mobs_total=0), row(mobs_total=0, completed=True), config)
+    assert parts["complete_kill_fraction"] == 0.0

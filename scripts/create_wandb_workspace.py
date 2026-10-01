@@ -91,6 +91,7 @@ workspace = ws.Workspace(
                 line(
                     "reward terms per episode",
                     "reward_parts/level_complete",
+                    "reward_parts/complete_kill_fraction",
                     "reward_parts/death",
                     "reward_parts/path_progress",
                     "reward_parts/mob_killed",

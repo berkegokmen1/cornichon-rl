@@ -11,6 +11,10 @@ UNREACHABLE = 2**31 - 1  # Simulation.UNREACHABLE: the player's cell has no path
 @dataclass(frozen=True)
 class RewardConfig:
     level_complete: float = 10.0
+    # Extra pay at the door, times the fraction of the level's mobs killed: reaching the door having fought through
+    # pays up to level_complete + this; jumping over every mob pays only level_complete. Paid only on completion, so
+    # it never rewards fighting instead of finishing.
+    complete_kill_fraction: float = 0.0
     death: float = -2.0
     # The game's own score values a kill at 100 points and a finished level at 25 (Scores.java). With kills worth 0.5
     # the agent learned to run past every mob (0.2 kills/episode of ~9 at difficulty 2) and most deaths were mobs.
@@ -44,6 +48,9 @@ def step_reward(previous, current, config):
     """Reward for one agent step and its parts. previous/current are simulator rows (dicts) before and after."""
     parts = {
         "level_complete": config.level_complete * float(current["completed"]),
+        "complete_kill_fraction": config.complete_kill_fraction * float(current["completed"]) * (
+            current["mobs_killed"] / current["mobs_total"] if current.get("mobs_total") else 0.0
+        ),
         "death": config.death * float(current["dead"]),
         "mob_killed": config.mob_killed * (current["mobs_killed"] - previous["mobs_killed"]),
         "damage_dealt": config.damage_dealt_per_hp * (current.get("damage_dealt", 0) - previous.get("damage_dealt", 0)),
