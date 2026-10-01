@@ -20,8 +20,9 @@ def _init(layer, gain=np.sqrt(2)):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, view_height=21, view_width=31, state_size=17, hidden=256, recurrent=False, grid_channels=None):
+    def __init__(self, view_height=21, view_width=31, state_size=20, hidden=256, recurrent=False, grid_channels=None):
         super().__init__()
+        self.state_size = state_size
         self.grid_channels = grid_channels or len(GRID_CHANNELS)
         self.recurrent = recurrent
         self.hidden = hidden
@@ -61,8 +62,9 @@ class ActorCritic(nn.Module):
         return zeros, zeros.clone()
 
     def _encode(self, obs):
-        grid = obs["grid"][:, : self.grid_channels]  # channels are only ever appended, so older models read a prefix
-        return self.trunk(torch.cat([self.grid(grid), self.state(obs["state"])], dim=1))
+        # channels and state features are only ever appended, so older models read a prefix
+        grid = obs["grid"][:, : self.grid_channels]
+        return self.trunk(torch.cat([self.grid(grid), self.state(obs["state"][:, : self.state_size])], dim=1))
 
     def _memory(self, x, state, starts):
         if not self.recurrent:

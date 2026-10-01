@@ -3,8 +3,9 @@
 Observation (dict):
   grid  (10, H, W) 0/1 channels around the player (GRID_CHANNELS, incl. the sphere and which way each fireball
         flies), player at the centre cell, row 0 at the top.
-  state (17,)     Simulation.state() (velocities, health, mana, grounded, sphere offset/velocity, buff, door offset,
-                  path distance, difficulty, sub-cell position) + fraction of the time limit used.
+  state (20,)     Simulation.state() (velocities, health, mana, grounded, sphere offset/velocity, buff, door offset,
+                  path distance, difficulty, sub-cell position) + fraction of the time limit used + mob compass
+                  (path distance to the nearest living mob, its dx, dy). Models from before the compass read the first 17.
 Action: MultiDiscrete(ACTION_NVEC), each decision held for `repeat` game frames (60 fps; repeat 4 -> 15 Hz).
 Episode: one level. Ends on reaching the door (success), death, or at the time limit (truncation): time_base +
 time_per_tile decisions per tile of shortest path from the start to the door, capped at max_steps, so bigger
@@ -19,7 +20,8 @@ from .curriculum import LevelSpec
 from .reward import UNREACHABLE, RewardConfig, step_reward
 from .service import ACTION_NVEC, GRID_CHANNELS, SimService, decode_grid
 
-STATE_SIZE = 17
+STATE_SIZE = 20
+COMPASS = slice(17, 20)
 
 
 def observation_space(view_height, view_width):
@@ -38,8 +40,9 @@ def time_limit(start_distance, max_steps, time_base, time_per_tile):
 
 def observe(row, steps, limit, height, width):
     state = np.empty(STATE_SIZE, np.float32)
-    state[:-1] = np.clip(row["state"], -10.0, 10.0)
-    state[-1] = steps / limit
+    state[:16] = np.clip(row["state"], -10.0, 10.0)
+    state[16] = steps / limit
+    state[COMPASS] = row.get("mob_compass", (1.0, 0.0, 0.0))
     return {"grid": decode_grid(row, height, width), "state": state}
 
 

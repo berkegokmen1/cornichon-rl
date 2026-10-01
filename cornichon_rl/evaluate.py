@@ -82,7 +82,10 @@ def load_policy(path, device):
     env_config = EnvConfig(**checkpoint["config"]["env"])
     model_config = checkpoint["config"].get("model", {})  # absent in checkpoints from before the LSTM option
     grid_channels = checkpoint["model"]["grid.0.weight"].shape[1]  # 8 before v4 added the sphere/fireball channels
-    model = ActorCritic(env_config.view_height, env_config.view_width, grid_channels=grid_channels, **model_config).to(device)
+    state_size = checkpoint["model"]["state.0.weight"].shape[1]  # 17 before the mob compass
+    model = ActorCritic(
+        env_config.view_height, env_config.view_width, state_size=state_size, grid_channels=grid_channels, **model_config
+    ).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()
     return model, env_config, RewardConfig.from_dict(checkpoint["config"]["reward"])

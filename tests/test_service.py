@@ -103,3 +103,17 @@ def test_old_clients_still_get_one_byte_grids():
     proc.stdin.close()
     proc.wait(timeout=10)
     assert len(base64.b64decode(row["grid"])) == hello["view_width"] * hello["view_height"]
+
+
+def test_mob_compass_points_at_a_living_mob(service):
+    import base64
+
+    row = service.reset([0], [21], [2], [4])[0]
+    assert row["mobs_left"] > 0 and 0 <= row["mob_distance"] < 10_000
+    distance, dx, dy = row["mob_compass"]
+    snap = service.snapshot(0)
+    cells = np.frombuffer(base64.b64decode(snap["grid"]), "<u2").reshape(snap["height"], snap["width"])
+    px, py = round(snap["player"][0]), round(snap["player"][1])
+    r, c = snap["top_y"] - (py + round(dy * 30)), px + round(dx * 30)
+    assert cells[r, c] & (4 | 8)  # the compass target cell holds a mob or wizard
+    assert abs(round(dx * 30)) + abs(round(dy * 30)) <= row["mob_distance"]  # path is never shorter than the Manhattan offset

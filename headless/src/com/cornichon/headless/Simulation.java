@@ -138,9 +138,20 @@ final class Simulation {
       if (i > 0) json.append(',');
       json.append(String.format(Locale.US, "%.4f", state[i]));
     }
+    // Mob compass: shortest path to the nearest living mob and that mob's offset. A separate field, so clients that
+    // only know the 16-number state are unaffected.
+    int[] nearest = nearestMob();
     json.append(String.format(
       Locale.US,
-      "],\"completed\":%b,\"dead\":%b,\"frames\":%d,\"mobs_killed\":%d,\"collected\":%d,\"damage\":%.1f," +
+      "],\"mob_distance\":%d,\"mob_compass\":[%.4f,%.4f,%.4f]",
+      nearest[0],
+      nearest[0] == UNREACHABLE ? 1f : Math.min(nearest[0] / 100f, 1f),
+      nearest[0] == UNREACHABLE ? 0f : nearest[1] / 30f,
+      nearest[0] == UNREACHABLE ? 0f : nearest[2] / 30f
+    ));
+    json.append(String.format(
+      Locale.US,
+      ",\"completed\":%b,\"dead\":%b,\"frames\":%d,\"mobs_killed\":%d,\"collected\":%d,\"damage\":%.1f," +
       "\"damage_dealt\":%d,\"health\":%.1f,\"score\":%d,\"door_distance\":%d,\"x\":%.3f,\"y\":%.3f,\"seed\":%d,\"difficulty\":%d,\"monster_difficulty\":%d," +
       "\"mobs_total\":%d,\"mobs_left\":%d,\"door_closed\":%b}",
       level.isCompleted(),
@@ -289,6 +300,49 @@ final class Simulation {
       p.x - Math.round(p.x),
       p.y - Math.round(p.y),
     };
+  }
+
+  /**
+   * {path distance, dx, dy} from the player to the nearest living mob by shortest 4-connected path (multi-source BFS
+   * from every mob cell; ignores gravity like the door distance). Distance UNREACHABLE when no mob is reachable.
+   */
+  private int[] nearestMob() {
+    int rows = map.length, cols = map[0].length;
+    int[] distance = new int[rows * cols];
+    int[] source = new int[rows * cols];
+    Arrays.fill(distance, UNREACHABLE);
+    ArrayDeque<Integer> queue = new ArrayDeque<Integer>();
+    for (Entity e : level.getEntities()) {
+      if (!(e instanceof Mob)) continue;
+      Vector2 at = e.getBody().getPosition();
+      int r = rows - 1 - Math.round(at.y), c = Math.round(at.x);
+      if (r < 0 || r >= rows || c < 0 || c >= cols || distance[r * cols + c] == 0) continue;
+      distance[r * cols + c] = 0;
+      source[r * cols + c] = r * cols + c;
+      queue.add(r * cols + c);
+    }
+    Vector2 p = level.getPlayer().getBody().getPosition();
+    int target = (rows - 1 - Math.round(p.y)) * cols + Math.round(p.x);
+    int[][] moves = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+    while (!queue.isEmpty()) {
+      int cell = queue.poll();
+      if (cell == target) break;
+      int r = cell / cols, c = cell % cols;
+      for (int[] m : moves) {
+        int rr = r + m[0], cc = c + m[1];
+        if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) continue;
+        int next = rr * cols + cc;
+        if (isBrick(map[rr][cc]) || distance[next] != UNREACHABLE) continue;
+        distance[next] = distance[cell] + 1;
+        source[next] = source[cell];
+        queue.add(next);
+      }
+    }
+    if (target < 0 || target >= distance.length || distance[target] == UNREACHABLE) {
+      return new int[] { UNREACHABLE, 0, 0 };
+    }
+    int mob = source[target];
+    return new int[] { distance[target], mob % cols - Math.round(p.x), (rows - 1 - mob / cols) - Math.round(p.y) };
   }
 
   /** Shortest 4-connected path through non-brick cells from every map cell to the door (ignores gravity). */

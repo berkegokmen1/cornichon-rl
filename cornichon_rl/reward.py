@@ -27,6 +27,9 @@ class RewardConfig:
     # hiding is not a safe way to avoid damage.
     cleared: float = 5.0
     mobs_alive_step: float = -0.003
+    # Arena hunting: + per tile the path to the nearest living mob gets shorter. Steps with a kill are skipped (the
+    # target changes, so the distance jumps), which keeps it from paying for walking back and forth.
+    hunt_progress: float = 0.0
 
     @classmethod
     def from_dict(cls, values):
@@ -50,10 +53,14 @@ def step_reward(previous, current, config):
         "path_progress": 0.0,
         "cleared": 0.0,
         "mobs_alive": 0.0,
+        "hunt_progress": 0.0,
     }
     if current.get("door_closed"):
         parts["cleared"] = config.cleared * float(previous["mobs_left"] > 0 and current["mobs_left"] == 0)
         parts["mobs_alive"] = config.mobs_alive_step * float(current["mobs_left"] > 0)
+        before, after = previous.get("mob_distance", UNREACHABLE), current.get("mob_distance", UNREACHABLE)
+        if previous["mobs_left"] == current["mobs_left"] and before != UNREACHABLE and after != UNREACHABLE:
+            parts["hunt_progress"] = config.hunt_progress * (before - after)
     before, after = previous["door_distance"], current["door_distance"]
     if before != UNREACHABLE and after != UNREACHABLE:
         parts["path_progress"] = config.path_progress * (before - after)

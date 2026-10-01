@@ -37,3 +37,4 @@ eval:
 
 reward:
   path_progress: 0.0   # no door to walk to
+  hunt_progress: 0.1   # + per tile closer to the nearest living mob (arena_v2; arena_v1 stopped hunting)

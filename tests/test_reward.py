@@ -33,3 +33,14 @@ def test_sphere_hits_pay_on_the_way_to_a_kill():
     assert parts["damage_dealt"] == config.damage_dealt_per_hp * 25
     kill = config.mob_killed + 100 * config.damage_dealt_per_hp
     assert kill * 9 > config.level_complete  # clearing a difficulty-2 maze is worth more than the door, as in the game
+
+
+def test_hunt_progress_only_in_arena_and_not_on_kill_steps():
+    config = RewardConfig(hunt_progress=0.1)
+    arena = dict(door_closed=True, mobs_left=3)
+    _, parts = step_reward(row(mob_distance=20, **arena), row(mob_distance=15, **arena), config)
+    assert abs(parts["hunt_progress"] - 0.5) < 1e-9
+    _, parts = step_reward(row(mob_distance=2, **arena), row(mob_distance=30, door_closed=True, mobs_left=2), config)
+    assert parts["hunt_progress"] == 0.0  # a kill switched the target
+    _, parts = step_reward(row(mob_distance=20), row(mob_distance=15), config)
+    assert parts["hunt_progress"] == 0.0  # not an arena
